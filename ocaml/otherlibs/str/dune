@@ -33,7 +33,6 @@
   (files
     .str.objs/native/str.cmx
     libstr_stubs.a
-    libstr_stubs_native.a
     (dllstr_stubs.so as stublibs/dllstr_stubs.so)
     str.cmxa
     str.a

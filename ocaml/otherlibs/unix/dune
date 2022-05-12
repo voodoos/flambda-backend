@@ -56,7 +56,6 @@
     unix.mli
     unixLabels.mli
     libunix_stubs.a
-    libunix_stubs_native.a
     (dllunix_stubs.so as stublibs/dllunix_stubs.so)
     (socketaddr.h as caml/socketaddr.h)
     (unixsupport.h as caml/unixsupport.h)

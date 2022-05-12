@@ -61,9 +61,9 @@
     (threads.cmxa as threads/threads.cmxa)
     (threads.a as threads/threads.a)
 
-    libthreads_stubs.a
+    libthreads_stubs_byte.a
     libthreads_stubs_native.a
-    (dllthreads_stubs.so as stublibs/dllthreads_stubs.so)
+    (dllthreads_stubs_byte.so as stublibs/dllthreads_stubs_byte.so)
 
     (thread.mli as threads/thread.mli)
     (condition.mli as threads/condition.mli)
@@ -92,4 +92,3 @@
   )
   (section lib)
   (package ocaml))
-
