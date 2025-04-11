@@ -147,8 +147,8 @@ val modtypes:
   module_type -> module_type -> module_coercion
 
 val modtypes_with_shape:
-  shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
-  module_type -> module_type -> module_coercion * Shape.t
+  shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool -> mark_both:bool ->
+  modes:modes -> module_type -> module_type -> module_coercion * Shape.t
 
 val strengthened_module_decl:
   loc:Location.t -> aliasable:bool -> Env.t -> mark:bool -> mmodes:modes ->
