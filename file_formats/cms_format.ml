@@ -98,7 +98,8 @@ let uid_tables_of_binary_annots binary_annots =
     );
   cms_uid_to_loc, cms_uid_to_attributes
 
-let save_cms target modname binary_annots initial_env shape =
+let save_cms target modname binary_annots initial_env shape
+  cms_declaration_dependencies =
   if (!Clflags.binary_annotations_cms && not !Clflags.print_types) then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] (Unit_info.Artifact.filename target)
@@ -117,9 +118,6 @@ let save_cms target modname binary_annots initial_env shape =
         in
         let cms_uid_to_loc, cms_uid_to_attributes =
           uid_tables_of_binary_annots binary_annots
-        in
-        let cms_declaration_dependencies =
-          Cmt_format.get_declaration_dependencies ()
         in
         let cms =
           {
