@@ -19,6 +19,7 @@ open Shape
 
 type result =
   | Resolved of Uid.t
+  | Resolved_decl of Shape.Uid.t
   | Resolved_alias of Uid.t * result
   | Unresolved of t
   | Approximated of Uid.t option
@@ -27,18 +28,20 @@ type result =
 let rec print_result fmt result =
   match result with
   | Resolved uid ->
-      Format.fprintf fmt "@[Resolved: %a@]@;" Uid.print uid
+      Format.fprintf fmt "@[Resolved:@ %a@]" Uid.print uid
+  | Resolved_decl uid ->
+      Format.fprintf fmt "@[Resolved decl:@ %a@]" Uid.print uid
   | Resolved_alias (uid, r) ->
-      Format.fprintf fmt "@[Alias: %a -> %a@]@;"
+      Format.fprintf fmt "@[Alias:@ %a@] ->@ %a"
         Uid.print uid print_result r
   | Unresolved shape ->
-      Format.fprintf fmt "@[Unresolved: %a@]@;" print shape
+      Format.fprintf fmt "@[Unresolved:@ %a@]" print shape
   | Approximated (Some uid) ->
-      Format.fprintf fmt "@[Approximated: %a@]@;" Uid.print uid
+      Format.fprintf fmt "@[Approximated:@ %a@]" Uid.print uid
   | Approximated None ->
-      Format.fprintf fmt "@[Approximated: No uid@]@;"
+      Format.fprintf fmt "Approximated: No uid"
   | Internal_error_missing_uid ->
-      Format.fprintf fmt "@[Missing uid@]@;"
+      Format.fprintf fmt "Missing uid"
 
 
 let find_shape env id =
@@ -89,6 +92,45 @@ end) = struct
      bind [x] to [None] in the environment. [Some v] is used for
      actual substitutions, for example in [App(Abs(x, body), t)], when
      [v] is a thunk that will evaluate to the normal form of [t]. *)
+
+  (* [_print_nf] is an (incomplete) printer for normal forms
+     useful for debugging purposes *)
+  let _print_nf fmt nf =
+    let print_uid_opt =
+      Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
+    in
+    let rec aux fmt { uid; desc; _ }=
+      match desc with
+      | NComp_unit name -> Format.fprintf fmt "CU %s" name
+      | NLeaf ->
+          Format.fprintf fmt "<%a>" print_uid_opt uid
+      | NVar var ->
+          Format.fprintf fmt "%a%a" Ident.print var print_uid_opt uid
+      | NProj (nf, item) ->
+        Format.fprintf fmt "(%a.%a)%a" aux nf Item.print item print_uid_opt uid
+      | NApp (nf1, nf2) ->
+          Format.fprintf fmt "@[%a(@,%a)%a@]" aux nf1 aux nf2
+            print_uid_opt uid
+      | NStruct map ->
+          let print_map fmt =
+            Item.Map.iter (fun item (Thunk (_, t)) ->
+                Format.fprintf fmt "@[<hv 2>%a ->@ %a;@]@,"
+                  Item.print item
+                  print t
+              )
+          in
+          if Item.Map.is_empty map then
+            Format.fprintf fmt "@[<hv>{%a}@]" print_uid_opt uid
+          else
+            Format.fprintf fmt "{@[<v>%a@,%a@]}" print_uid_opt uid print_map map
+      | NAlias (Thunk (_, t)) ->
+        Format.fprintf fmt "Alias@[(@[<v>%a@,<delayed:%a>@])@]"
+          print_uid_opt uid print t
+      | NError s ->
+          Format.fprintf fmt "Error %s" s
+      | NAbs _ -> ()
+    in
+    Format.fprintf fmt "@[%a@]@;" aux nf
 
   let approx_nf nf = { nf with approximated = true }
 
@@ -412,4 +454,51 @@ module Local_reduce =
   end)
 
 let local_reduce = Local_reduce.reduce
-let local_reduce_for_uid = Local_reduce.reduce_for_uid
+
+(* POC *)
+let uid_memo : Uid.t Uid.Tbl.t ref = Local_store.s_table Uid.Tbl.create 16
+
+let make_definition_uid ~current_unit decl_uid =
+  match Uid.Tbl.find_opt !uid_memo decl_uid with
+  | Some uid -> uid
+  | None ->
+    let uid = Uid.mk_ghost ~current_unit in
+    Uid.Deps.record_declaration_dependency
+      (Definition_to_declaration, uid, decl_uid);
+    Uid.Tbl.add !uid_memo decl_uid uid;
+    uid
+
+let find_uid_by_path env namespace path =
+  try
+    Option.some @@ match (namespace : Sig_component_kind.t) with
+      | Value ->
+        let vd = Env.find_value path env in
+        vd.val_uid
+      | Type | Extension_constructor | Constructor | Label | Unboxed_label ->
+        let td = Env.find_type path env in
+        td.type_uid
+      | Module ->
+        let md = Env.find_module path env in
+        md.md_uid
+      | Module_type ->
+        let mtd = Env.find_modtype path env in
+        mtd.mtd_uid
+      | Class ->
+        let cty = Env.find_class path env in
+        cty.cty_uid
+      | Class_type ->
+        let clty = Env.find_cltype path env in
+        clty.clty_uid
+  with Not_found -> None
+
+let local_reduce_for_uid env ~namespace path shape =
+  match Local_reduce.reduce_for_uid env shape with
+  | Internal_error_missing_uid->
+    begin match find_uid_by_path env namespace path with
+      | Some uid ->
+          let current_unit = Env.get_unit_name () in
+          let uid = make_definition_uid ~current_unit uid in
+          Resolved_decl uid
+      | None -> Internal_error_missing_uid
+    end
+  | otherwise -> otherwise

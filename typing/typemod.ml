@@ -3779,7 +3779,7 @@ let type_implementation target modulename initial_env ast =
   let save_cmt_and_cms target annots initial_env cmi shape =
       let decl_deps =
         (* This is cleared after saving the cmt so we have to save is before *)
-        Cmt_format.get_declaration_dependencies ()
+        Shape.Uid.Deps.get ()
       in
     Cmt_format.save_cmt (Unit_info.cmt target) modulename
       annots initial_env cmi shape;
@@ -3965,7 +3965,7 @@ let type_implementation target modulename initial_env ast =
 let save_signature target modname tsg initial_env cmi =
   let decl_deps =
     (* This is cleared after saving the cmt so we have to save is before *)
-    Cmt_format.get_declaration_dependencies ()
+    Shape.Uid.Deps.get ()
   in
   Cmt_format.save_cmt (Unit_info.cmti target) modname
     (Cmt_format.Interface tsg) initial_env (Some cmi) None;
@@ -4084,7 +4084,7 @@ let package_units initial_env objfiles target_cmi modulename =
     in
     let decl_deps =
       (* This is cleared after saving the cmt so we have to save is before *)
-      Cmt_format.get_declaration_dependencies ()
+      Shape.Uid.Deps.get ()
     in
     Cmt_format.save_cmt  (Unit_info.companion_cmt target_cmi) modulename
       (Cmt_format.Packed (sg, objfiles)) initial_env  None (Some shape);
@@ -4114,7 +4114,7 @@ let package_units initial_env objfiles target_cmi modulename =
       let sign = Subst.Lazy.force_signature cmi.Cmi_format.cmi_sign in
       let decl_deps =
         (* This is cleared after saving the cmt so we have to save is before *)
-        Cmt_format.get_declaration_dependencies ()
+        Shape.Uid.Deps.get ()
       in
       Cmt_format.save_cmt (Unit_info.companion_cmt target_cmi)  modulename
         (Cmt_format.Packed (sign, objfiles)) initial_env (Some cmi) (Some shape);

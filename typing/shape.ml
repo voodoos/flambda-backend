@@ -17,6 +17,7 @@ module Uid = struct
   type t =
     | Compilation_unit of string
     | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
+    | Ghost_item of { comp_unit: string; id: int }
     | Internal
     | Predef of string
     | Unboxed_version of t
@@ -33,19 +34,24 @@ module Uid = struct
           if c <> 0 then c else String.compare c1.comp_unit c2.comp_unit
         in
         if c <> 0 then c else Stdlib.compare c1.from c2.from
+      | Ghost_item c1, Ghost_item c2 ->
+        let c = Int.compare c1.id c2.id in
+        if c <> 0 then c else String.compare c1.comp_unit c2.comp_unit
       | Internal, Internal -> 0
       | Predef s1, Predef s2 -> String.compare s1 s2
       | Unboxed_version t1, Unboxed_version t2 -> compare t1 t2
       | Compilation_unit _,
-        (Item _ | Internal | Predef _ | Unboxed_version _) ->
+        (Item _ | Ghost_item _ | Internal | Predef _ | Unboxed_version _) ->
         -1
-      | Item _, (Internal | Predef _| Unboxed_version _) -> -1
+      | Item _ , (Internal | Predef _| Unboxed_version _) -> -1
+      | Ghost_item _ , (Internal | Predef _| Unboxed_version _) -> -1
       | Internal, (Predef _ | Unboxed_version _) -> -1
       | Predef _, Unboxed_version _ -> -1
-      | (Item _ | Internal | Predef _ | Unboxed_version _),
+      | (Item _ | Ghost_item _ | Internal | Predef _ | Unboxed_version _),
         Compilation_unit _ ->
         1
-      | (Internal | Predef _ | Unboxed_version _), Item _ -> 1
+      | ( Ghost_item _ | Internal | Predef _ | Unboxed_version _), Item _  -> 1
+      | ( Item _ | Internal | Predef _ | Unboxed_version _), Ghost_item _  -> -1
       | (Predef _ | Unboxed_version _), Internal -> 1
       | Unboxed_version _, Predef _ -> 1
 
@@ -64,6 +70,8 @@ module Uid = struct
       | Item { comp_unit; id; from } ->
           Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
+      | Ghost_item { comp_unit; id } ->
+          Format.fprintf fmt "[G]%s.%d" comp_unit id
 
     let output oc t =
       let fmt = Format.formatter_of_out_channel oc in
@@ -71,8 +79,11 @@ module Uid = struct
   end)
 
   let id = ref (-1)
+  let id_param = ref (-1)
 
-  let reinit () = id := (-1)
+  let reinit () =
+    id := (-1);
+    id_param := (-1)
 
   let mk  ~current_unit =
       let comp_unit, from =
@@ -84,6 +95,17 @@ module Uid = struct
       in
       incr id;
       Item { comp_unit; id = !id; from }
+
+  let mk_ghost ~current_unit =
+    let comp_unit =
+      let open Unit_info in
+      match current_unit with
+      | None -> ""
+      | Some ui ->
+        Compilation_unit.full_path_as_string (modname ui)
+    in
+    incr id_param;
+    Ghost_item { comp_unit; id = !id_param }
 
   let of_compilation_unit_id id =
     Compilation_unit (id |> Compilation_unit.full_path_as_string)
@@ -107,6 +129,20 @@ module Uid = struct
   let for_actual_declaration = function
     | Item _ -> true
     | _ -> false
+
+  module Deps = struct
+    type kind = Definition_to_declaration | Declaration_to_declaration
+
+    let uids_deps : (kind * t * t) list ref = ref []
+
+    let clear () = uids_deps := []
+
+    let get () = !uids_deps
+
+    let record_declaration_dependency (rk, uid1, uid2) =
+      if not (equal uid1 uid2) then
+        uids_deps := (rk, uid1, uid2) :: !uids_deps
+    end
 end
 
 module Sig_component_kind = struct
