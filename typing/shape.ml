@@ -16,10 +16,7 @@
 module Uid = struct
   type t =
     | Compilation_unit of string
-    | Item of {
-        comp_unit: string;
-        id: int;
-        from: Unit_info.intf_or_impl }
+    | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
     | Internal
     | Predef of string
     | Unboxed_version of t
