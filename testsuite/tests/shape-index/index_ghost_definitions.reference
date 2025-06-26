@@ -1,0 +1,34 @@
+Indexed shapes:
+Resolved: Index_ghost_definitions.4:
+  X (File "index_ghost_definitions.ml", line 29, characters 11-12)
+Resolved decl: [G]Index_ghost_definitions.0:
+  X.u (File "index_ghost_definitions.ml", line 29, characters 11-14)
+Resolved: Index_ghost_definitions.4:
+  X (File "index_ghost_definitions.ml", line 28, characters 11-12)
+Resolved decl: [G]Index_ghost_definitions.0:
+  X.u (File "index_ghost_definitions.ml", line 28, characters 11-14)
+Resolved: Index_ghost_definitions.1:
+  S (File "index_ghost_definitions.ml", line 27, characters 14-15)
+Resolved: Index_ghost_definitions.2:
+  X (File "index_ghost_definitions.ml", line 24, characters 11-12)
+Resolved decl: [G]Index_ghost_definitions.0:
+  X.u (File "index_ghost_definitions.ml", line 24, characters 11-14)
+Resolved: Index_ghost_definitions.2:
+  X (File "index_ghost_definitions.ml", line 23, characters 11-12)
+Resolved decl: [G]Index_ghost_definitions.0:
+  X.u (File "index_ghost_definitions.ml", line 23, characters 11-14)
+Resolved: Index_ghost_definitions.1:
+  S (File "index_ghost_definitions.ml", line 22, characters 14-15)
+
+Uid dependencies:
+[G]Index_ghost_definitions.0 <- Index_ghost_definitions.0
+
+Uid of decls:
+Index_ghost_definitions.0:
+  u (File "index_ghost_definitions.ml", line 19, characters 6-7)
+Index_ghost_definitions.1:
+  S (File "index_ghost_definitions.ml", line 18, characters 12-13)
+Index_ghost_definitions.3:
+  G (File "index_ghost_definitions.ml", line 22, characters 7-8)
+Index_ghost_definitions.5:
+  H (File "index_ghost_definitions.ml", line 27, characters 7-8)
