@@ -518,7 +518,8 @@ let rec stuck_on_var_or_pack (t : t) =
   | Leaf -> None
 
 let local_reduce_for_uid env ~namespace path shape =
-  match Local_reduce.reduce_for_uid env shape with
+  let rec aux = function
+  | Resolved_alias (uid, result) -> Resolved_alias (uid, aux result)
   | Missing_uid t ->
     begin match stuck_on_var_or_pack t with
     | None -> Internal_error_missing_uid
@@ -532,3 +533,5 @@ let local_reduce_for_uid env ~namespace path shape =
       end
     end
   | otherwise -> otherwise
+  in
+  aux (Local_reduce.reduce_for_uid env shape )
