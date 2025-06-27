@@ -19,10 +19,11 @@ open Shape
 
 type result =
   | Resolved of Uid.t
-  | Resolved_decl of Shape.Uid.t
+  | Resolved_decl of Uid.t
   | Resolved_alias of Uid.t * result
   | Unresolved of t
   | Approximated of Uid.t option
+  | Missing_uid of t
   | Internal_error_missing_uid
 
 let rec print_result fmt result =
@@ -40,6 +41,8 @@ let rec print_result fmt result =
       Format.fprintf fmt "@[Approximated:@ %a@]" Uid.print uid
   | Approximated None ->
       Format.fprintf fmt "Approximated: No uid"
+  | Missing_uid shape ->
+      Format.fprintf fmt "Missing uid: %a" print shape
   | Internal_error_missing_uid ->
       Format.fprintf fmt "Missing uid"
 
@@ -428,7 +431,11 @@ end) = struct
          [Missing_uid] reported will allow Merlin (or another tool working
          with the index) to ask users to report the issue if it does happen.
       *)
-      Internal_error_missing_uid
+      (* Format.eprintf "IEMUID: \n%a\n%a\n%!"
+      _print_nf nf
+      Shape.print (read_back env nf); *)
+      (* Internal_error_missing_uid *)
+      Missing_uid (read_back env nf)
 
   let reduce_for_uid global_env t =
     let fuel = ref Params.fuel in
@@ -455,17 +462,19 @@ module Local_reduce =
 
 let local_reduce = Local_reduce.reduce
 
-(* POC *)
-let uid_memo : Uid.t Uid.Tbl.t ref = Local_store.s_table Uid.Tbl.create 16
+module Ident_and_uid = Identifiable.Make (Identifiable.Pair (Ident) (Uid))
 
-let make_definition_uid ~current_unit decl_uid =
-  match Uid.Tbl.find_opt !uid_memo decl_uid with
+let uid_memo : Uid.t Ident_and_uid.Tbl.t ref =
+  Local_store.s_table Ident_and_uid.Tbl.create 16
+
+let make_definition_uid ~current_unit parent_id decl_uid =
+  match Ident_and_uid.Tbl.find_opt !uid_memo (parent_id, decl_uid) with
   | Some uid -> uid
   | None ->
     let uid = Uid.mk_ghost ~current_unit in
     Uid.Deps.record_declaration_dependency
       (Definition_to_declaration, uid, decl_uid);
-    Uid.Tbl.add !uid_memo decl_uid uid;
+      Ident_and_uid.Tbl.add !uid_memo (parent_id, decl_uid) uid;
     uid
 
 let find_uid_by_path env namespace path =
@@ -491,14 +500,30 @@ let find_uid_by_path env namespace path =
         clty.clty_uid
   with Not_found -> None
 
+let rec stuck_on_var (t : t) =
+  match t.desc with
+  | Var id ->
+      (* This should not happen if we only reduce closed terms *)
+      Some id
+  | App (t, _) | Proj (t, _) -> stuck_on_var t
+  | Struct _ | Abs _ -> None
+  | Alias _ -> None
+  | Comp_unit _ ->None
+  | Error _ -> None
+  | Leaf -> None
+
 let local_reduce_for_uid env ~namespace path shape =
   match Local_reduce.reduce_for_uid env shape with
-  | Internal_error_missing_uid->
-    begin match find_uid_by_path env namespace path with
-      | Some uid ->
-          let current_unit = Env.get_unit_name () in
-          let uid = make_definition_uid ~current_unit uid in
-          Resolved_decl uid
-      | None -> Internal_error_missing_uid
+  | Missing_uid t ->
+    begin match stuck_on_var t with
+    | None -> Internal_error_missing_uid
+    | Some parent_id ->
+      begin match find_uid_by_path env namespace path with
+        | Some uid ->
+            let current_unit = Env.get_unit_name () in
+            let uid = make_definition_uid ~current_unit parent_id uid in
+            Resolved_decl uid
+        | None -> Internal_error_missing_uid
+      end
     end
   | otherwise -> otherwise

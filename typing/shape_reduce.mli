@@ -25,6 +25,7 @@ type result =
   | Unresolved of Shape.t (** Result still contains [Comp_unit] terms *)
   | Approximated of Shape.Uid.t option
     (** Reduction failed: it can arrive with first-class modules for example *)
+  | Missing_uid of Shape.t
   | Internal_error_missing_uid
     (** Reduction succeeded but no uid was found, this should never happen *)
 
