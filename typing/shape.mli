@@ -151,6 +151,7 @@ and desc =
   | Abs of var * t
   | App of t * t
   | Struct of t Item.Map.t
+  | Pack of Ident.t
   | Alias of t
   | Leaf
   | Proj of t * Item.t
@@ -186,7 +187,7 @@ val decompose_abs : t -> (var * t) option
 
 (* CR lmaurer: Should really take a [Compilation_unit.t] *)
 val for_persistent_unit : string -> t
-val leaf_for_unpack : t
+val leaf_for_unpack : Ident.t -> t
 
 module Map : sig
   type shape = t

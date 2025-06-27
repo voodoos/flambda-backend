@@ -2745,7 +2745,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
-      Shape.leaf_for_unpack, None
+      Shape.leaf_for_unpack (Ident.create_local "Pkg"), None
   | Pmod_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
   | Pmod_instance glob ->

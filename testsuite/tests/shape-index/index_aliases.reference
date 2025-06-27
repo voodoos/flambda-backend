@@ -1,15 +1,17 @@
 Indexed shapes:
-Missing uid: t (File "index_aliases.ml", line 52, characters 9-10)
+Resolved decl: [G]Index_aliases.3:
+  t (File "index_aliases.ml", line 52, characters 9-10)
 Resolved: Index_aliases.26:
   FArg (File "index_aliases.ml", line 49, characters 5-9)
 Resolved: Index_aliases.25:
   Arg (File "index_aliases.ml", line 48, characters 19-22)
-Approximated: Index_aliases.22:
+Resolved decl: [G]Index_aliases.2:
   X.F (File "index_aliases.ml", line 48, characters 14-17)
-Missing uid: Z.s (File "index_aliases.ml", line 45, characters 8-11)
-Alias: Index_aliases.23 -> Approximated: Index_aliases.22:
+Resolved decl: [G]Index_aliases.1:
+  Z.s (File "index_aliases.ml", line 45, characters 8-11)
+Alias: Index_aliases.23 -> Missing uid: {Pack:Pkg/311} . "M"[module] :
   Y (File "index_aliases.ml", line 42, characters 11-12)
-Approximated: Index_aliases.22:
+Resolved decl: [G]Index_aliases.0:
   X.M (File "index_aliases.ml", line 41, characters 11-14)
 Resolved: Index_aliases.17:
   x (File "index_aliases.ml", line 40, characters 16-17)
@@ -44,6 +46,10 @@ Index_aliases.18 <-> Index_aliases.11
 Index_aliases.19 <-> Index_aliases.12
 Index_aliases.20 <-> Index_aliases.14
 Index_aliases.21 <-> Index_aliases.15
+[G]Index_aliases.0 <- Index_aliases.12
+[G]Index_aliases.1 <- Index_aliases.11
+[G]Index_aliases.2 <- Index_aliases.15
+[G]Index_aliases.3 <- Index_aliases.14
 
 Uid of decls:
 Index_aliases.0: t (File "index_aliases.ml", line 18, characters 23-24)

@@ -67,6 +67,7 @@ end) = struct
     | NAlias of delayed_nf
     | NProj of nf * Item.t
     | NLeaf
+    | NPack of Ident.t
     | NComp_unit of string
     | NError of string
 
@@ -107,6 +108,8 @@ end) = struct
       | NComp_unit name -> Format.fprintf fmt "CU %s" name
       | NLeaf ->
           Format.fprintf fmt "<%a>" print_uid_opt uid
+      | NPack id ->
+          Format.fprintf fmt "<%a>" Ident.print id
       | NVar var ->
           Format.fprintf fmt "%a%a" Ident.print var print_uid_opt uid
       | NProj (nf, item) ->
@@ -166,15 +169,17 @@ end) = struct
     | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
-    | NVar _, (NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NLeaf, (NVar _ | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NApp _, (NVar _ | NLeaf | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NAbs _, (NVar _ | NLeaf | NApp _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NStruct _, (NVar _ | NLeaf | NApp _ | NAbs _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NProj _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NComp_unit _ | NAlias _ | NError _)
-    | NComp_unit _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NAlias _ | NError _)
-    | NAlias _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NError _)
-    | NError _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _)
+    | NPack id1, NPack id2 -> Ident.equal id1 id2
+    | NVar _, (NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NPack _)
+    | NLeaf, (NVar _ | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NPack _)
+    | NApp _, (NVar _ | NLeaf | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NPack _)
+    | NAbs _, (NVar _ | NLeaf | NApp _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NPack _)
+    | NStruct _, (NVar _ | NLeaf | NApp _ | NAbs _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NPack _)
+    | NProj _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NComp_unit _ | NAlias _ | NError _ | NPack _)
+    | NComp_unit _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NAlias _ | NError _ | NPack _)
+    | NAlias _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NError _ | NPack _)
+    | NError _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NPack _)
+    | NPack _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
     -> false
 
   and equal_nf t1 t2 =
@@ -349,6 +354,7 @@ end) = struct
               reduce env res
           end
       | Leaf -> return NLeaf
+      | Pack id -> return (NPack id)
       | Struct m ->
           let mnf = Item.Map.map (delay_reduce env) m in
           return (NStruct mnf)
@@ -385,6 +391,7 @@ end) = struct
         let t = read_back nf in
         proj ?uid t item
     | NLeaf -> leaf' uid
+    | NPack path -> leaf_for_unpack path
     | NComp_unit s -> comp_unit ?uid s
     | NAlias nf -> alias ?uid (read_back_force nf)
     | NError t -> error ?uid t
@@ -416,7 +423,7 @@ end) = struct
     | NAlias _ -> false
     | NComp_unit _ -> true
     | NError _ -> false
-    | NLeaf -> false
+    | NLeaf | NPack _ -> false
 
   let rec reduce_aliases_for_uid env (nf : nf) =
     match nf with
@@ -500,22 +507,20 @@ let find_uid_by_path env namespace path =
         clty.clty_uid
   with Not_found -> None
 
-let rec stuck_on_var (t : t) =
+let rec stuck_on_var_or_pack (t : t) =
   match t.desc with
-  | Var id ->
-      (* This should not happen if we only reduce closed terms *)
-      Some id
-  | App (t, _) | Proj (t, _) -> stuck_on_var t
+  | Var id | Pack id -> Some id
+  | App (t, _) | Proj (t, _) -> stuck_on_var_or_pack t
   | Struct _ | Abs _ -> None
   | Alias _ -> None
-  | Comp_unit _ ->None
+  | Comp_unit _ -> None
   | Error _ -> None
   | Leaf -> None
 
 let local_reduce_for_uid env ~namespace path shape =
   match Local_reduce.reduce_for_uid env shape with
   | Missing_uid t ->
-    begin match stuck_on_var t with
+    begin match stuck_on_var_or_pack t with
     | None -> Internal_error_missing_uid
     | Some parent_id ->
       begin match find_uid_by_path env namespace path with

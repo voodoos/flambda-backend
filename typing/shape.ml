@@ -250,6 +250,7 @@ and desc =
   | Abs of var * t
   | App of t * t
   | Struct of t Item.Map.t
+  | Pack of Ident.t
   | Alias of t
   | Leaf
   | Proj of t * Item.t
@@ -275,15 +276,27 @@ let rec equal_desc d1 d2 =
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
   | Comp_unit c1, Comp_unit c2 -> String.equal c1 c2
-  | Var _, (Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Abs _, (Var _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | App _, (Var _ | Abs _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Struct _, (Var _ | Abs _ | App _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Leaf, (Var _ | Abs _ | App _ | Struct _ | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Proj _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Comp_unit _ | Alias _ | Error _)
-  | Comp_unit _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Alias _ | Error _)
-  | Alias _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Error _)
-  | Error _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _)
+  | Pack id1, Pack id2 -> Ident.equal id1 id2
+  | Var _,
+    (Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Abs _,
+    (Var _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | App _,
+    (Var _ | Abs _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Struct _,
+    (Var _ | Abs _ | App _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Leaf,
+    (Var _ | Abs _ | App _ | Struct _ | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Proj _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Comp_unit _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Alias _ | Error _ | Pack _)
+  | Alias _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Error _ | Pack _)
+  | Error _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Pack _)
+  | Pack _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
     -> false
 
 and equal t1 t2 =
@@ -346,6 +359,8 @@ let print fmt t =
           Format.fprintf fmt "@[<hv>{%a}@]" print_uid_opt uid
         else
           Format.fprintf fmt "{@[<v>%a@,%a@]}" print_uid_opt uid print_map map
+    | Pack id ->
+        Format.fprintf fmt "@[<hv>{Pack:%a}@]" Ident.print id
     | Alias t ->
         Format.fprintf fmt "Alias@[(@[<v>%a@,%a@])@]" print_uid_opt uid aux t
     | Error s ->
@@ -482,7 +497,9 @@ let of_path ~find_shape ~namespace path =
 let for_persistent_unit s =
   comp_unit ~uid:(Compilation_unit s) s
 
-let leaf_for_unpack = leaf' None
+let leaf_for_unpack id =
+  { uid = None; desc = Pack id; hash = Hashtbl.hash (hash_leaf, id);
+    approximated = false }
 
 let set_uid_if_none t uid =
   match t.uid with
