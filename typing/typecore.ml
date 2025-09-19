@@ -1309,7 +1309,8 @@ let add_pattern_variables ?check ?check_as env pv =
          {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.Value.id;
           val_zero_alloc = Zero_alloc.default;
-          val_uid = pv_uid
+          val_uid = pv_uid;
+          val_discourse = Discourse_types.empty;
          } env
     )
     pv env
@@ -1346,7 +1347,8 @@ let add_module_variables env module_variables =
         { md_type = modl.mod_type; md_attributes = [];
           md_modalities = Mode.Modality.Value.id;
           md_loc = mv_name.loc;
-          md_uid = mv_uid; }
+          md_uid = mv_uid;
+          md_discourse = Discourse_types.empty; }
       in
       let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
       Env.add_module_declaration ~shape:md_shape ~check:true mv_id pres md
@@ -3388,6 +3390,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.Value.id
             ; val_loc = pv_loc
             ; val_uid = pv_uid
+            ; val_discourse = Discourse_types.empty
             }
             val_env
          in
@@ -3400,6 +3403,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.Value.id
             ; val_loc = pv_loc
             ; val_uid = pv_uid
+            ; val_discourse = Discourse_types.empty
             }
             met_env
          in
@@ -6849,7 +6853,8 @@ and type_expect_
                 { md_type = modl.mod_type; md_attributes = [];
                   md_modalities = Modality.Value.id;
                   md_loc = name.loc;
-                  md_uid; }
+                  md_uid;
+                  md_discourse = Discourse_types.empty; }
               in
               let mode, locks = modl.mod_mode in
               let locks = Option.map (fun (a, _, _) -> a) locks in
@@ -8599,6 +8604,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             val_modalities = Modality.Value.id;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+            val_discourse = Discourse_types.empty;
           }
         in
         let exp_env = Env.add_value ~mode id desc env in

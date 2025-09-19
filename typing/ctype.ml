@@ -1413,6 +1413,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
     type_unboxed_version = None;
+    type_discourse = Discourse_types.empty;
   }
 
 let existential_name name_counter ty =
@@ -7142,6 +7143,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_unboxed_default = decl.type_unboxed_default;
       type_uid = decl.type_uid;
       type_unboxed_version;
+      type_discourse = Discourse_types.empty;
     }
   with Nondep_cannot_erase _ as exn ->
     clear_hash ();

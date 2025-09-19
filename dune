@@ -189,6 +189,7 @@
   primitive
   shape
   shape_reduce
+  discourse_types
   zero_alloc
   types
   btype

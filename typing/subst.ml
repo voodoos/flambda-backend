@@ -618,6 +618,7 @@ let rec type_declaration' copy_scope s decl =
     type_uid = decl.type_uid;
     type_unboxed_version =
       Option.map (type_declaration' copy_scope s) decl.type_unboxed_version;
+    type_discourse = Discourse_types.empty;
   }
 
 let type_declaration s decl =
@@ -879,6 +880,7 @@ let rec subst_lazy_value_description s descr =
       | _ -> descr.val_zero_alloc);
     val_attributes = attrs s descr.val_attributes;
     val_uid = descr.val_uid;
+    val_discourse = Discourse_types.empty;
   }
 
 and subst_lazy_module_decl scoping s md =
@@ -887,7 +889,8 @@ and subst_lazy_module_decl scoping s md =
     md_modalities = md.md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
-    md_uid = md.md_uid }
+    md_uid = md.md_uid;
+    md_discourse = Discourse_types.empty;}
 
 and subst_lazy_modtype scoping s = function
   | Mty_ident p ->

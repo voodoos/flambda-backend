@@ -111,6 +111,7 @@
   path
   shape
   shape_reduce
+  discourse_types
   allowance
   solver_intf
   solver
@@ -291,6 +292,8 @@
 (copy_files ../../typing/solver.ml)
 
 (copy_files ../../typing/shape_reduce.ml)
+
+(copy_files ../../typing/discourse_types.ml)
 
 (copy_files ../../typing/mode.ml)
 

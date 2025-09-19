@@ -317,6 +317,7 @@ in
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version uid;
       type_unboxed_version = None;
+      type_discourse = Discourse_types.empty;
     }
   in
   let decl =
@@ -335,6 +336,7 @@ in
       type_unboxed_default = false;
       type_uid = uid;
       type_unboxed_version;
+      type_discourse = Discourse_types.empty;
     }
   in
   add_type ~check:true id decl env
@@ -1093,6 +1095,7 @@ let transl_declaration env sdecl (id, uid) =
         type_unboxed_version = None;
         (* Unboxed versions are computed after all declarations have been
            translated, in [derive_unboxed_versions] *)
+        type_discourse = Discourse_types.empty;
       } in
   (* Check constraints *)
     List.iter
@@ -1264,6 +1267,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_unboxed_default = false;
         type_uid = Uid.unboxed_version decl.type_uid;
         type_unboxed_version = None;
+        type_discourse = Discourse_types.empty;
       }
 
 let derive_unboxed_versions decls env =
@@ -3839,6 +3843,7 @@ let transl_value_decl env loc ~modalities valdecl =
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+        val_discourse = Discourse_types.empty;
       }
   | [] ->
       raise (Error(valdecl.pval_loc, Val_in_structure))
@@ -3879,6 +3884,7 @@ let transl_value_decl env loc ~modalities valdecl =
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+        val_discourse = Discourse_types.empty;
       }
   in
   let (id, newenv) =
@@ -4010,6 +4016,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_unboxed_default = false;
           type_uid = Uid.unboxed_version type_uid;
           type_unboxed_version = None;
+          type_discourse = Discourse_types.empty;
         }
       | { type_unboxed_version = None ; _ } ->
         None
@@ -4043,6 +4050,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_unboxed_default;
       type_uid;
       type_unboxed_version;
+      type_discourse = Discourse_types.empty;
     }
   in
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
@@ -4107,7 +4115,9 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
             type_variance;
             type_separability;
           })
-        new_sig_decl.type_unboxed_version
+        new_sig_decl.type_unboxed_version;
+
+        type_discourse = Discourse_types.empty;
     } in
   {
     typ_id = id;
@@ -4147,6 +4157,7 @@ let transl_package_constraint ~loc ty =
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
     type_unboxed_version = None;
+    type_discourse = Discourse_types.empty;
   }
 
 (* Approximate a type declaration: just make all types abstract *)
@@ -4186,7 +4197,9 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_unboxed_default = false;
           type_uid = Uid.internal_not_actually_unique;
           type_unboxed_version = None;
+          type_discourse = Discourse_types.empty;
         };
+      type_discourse = Discourse_types.empty;
     }
   end
 

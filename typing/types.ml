@@ -631,6 +631,7 @@ type type_declaration =
     type_unboxed_default: bool;
     type_uid: Uid.t;
     type_unboxed_version : type_declaration option;
+    type_discourse: Discourse_types.Paths.t;
  }
 
 and type_decl_kind =
@@ -832,6 +833,7 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_discourse: Discourse_types.Paths.t;
     }
 
   type module_type =
@@ -865,6 +867,7 @@ module type Wrapped = sig
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
+    md_discourse: Discourse_types.Paths.t;
   }
 
   and modtype_declaration =
@@ -914,7 +917,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       val_zero_alloc;
       val_attributes;
       val_loc;
-      val_uid
+      val_uid;
+      val_discourse = Discourse_types.empty;
     }
 
   let module_declaration m {md_type; md_modalities; md_attributes;
@@ -925,6 +929,7 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       md_attributes;
       md_loc;
       md_uid;
+      md_discourse = Discourse_types.empty;
     }
 
   let modtype_declaration m {mtd_type; mtd_attributes; mtd_loc; mtd_uid} =
