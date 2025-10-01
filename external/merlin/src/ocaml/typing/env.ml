@@ -845,6 +845,10 @@ and cltype_data =
   { cltda_declaration : class_type_declaration;
     cltda_shape : Shape.t }
 
+and jkind_data =
+  { jkda_declaration : jkind_declaration;
+    jkda_shape : Shape.t }
+
 and short_paths_addition =
   | Type of Ident.t * type_declaration
   | Class_type of Ident.t * class_type_declaration
@@ -854,10 +858,6 @@ and short_paths_addition =
   | Class_type_open of Path.t * class_type_declaration NameMap.t
   | Module_type_open of Path.t * Subst.Lazy.modtype_declaration NameMap.t
   | Module_open of Path.t * module_data NameMap.t
-
-and jkind_data =
-  { jkda_declaration : jkind_declaration;
-    jkda_shape : Shape.t }
 
 let clda_mode = Types.class_mode |> Mode.Value.disallow_right
 
@@ -1115,6 +1115,11 @@ let scrape_alias =
   ref ((fun _env _mty -> assert false) :
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
 
+let scrape_lazy =
+  (* to be filled with Mtype.scrape_lazy *)
+  ref ((fun (_env : t) (_mty : Subst.Lazy.module_type) : Subst.Lazy.module_type ->
+    assert false))
+
 let shorten_module_path =
   (* to be filled with Printtyp.shorten_module_path *)
   ref ((fun _ _ -> assert false) :
@@ -1122,7 +1127,8 @@ let shorten_module_path =
 
 let md md_type =
   {md_type; md_modalities = Mode.Modality.undefined; md_attributes=[];
-   md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
+   md_loc=Location.none; md_uid = Uid.internal_not_actually_unique;
+   md_discourse = Discourse_types.empty;md_discourse_alias=None}
 
 (** The caller is not interested in modes, and thus [val_modalities] is
 invalidated. *)
@@ -1335,6 +1341,8 @@ let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
       md_loc = Location.none;
       md_attributes = [];
       md_uid = uid;
+      md_discourse = Discourse_types.empty;
+      md_discourse_alias = None;
     }
   in
   let mda_address = Lazy_backtrack.create_forced addr in
@@ -1704,6 +1712,7 @@ and find_type_unboxed_version path env seen =
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version decl.type_uid;
       type_unboxed_version = None;
+      type_discourse = Discourse_types.empty;
     }
 (* CR layouts v7.2: this should be reworked to expand abbrevations, e.g.
    in [type 'a id = 'a and f = float id], [f] can have an unboxed type.
@@ -3115,7 +3124,9 @@ let add_module_lazy ~update_summary id presence mty ?mode env =
                        md_modalities = Mode.Modality.undefined;
                        md_attributes = [];
                        md_loc = Location.none;
-                       md_uid = Uid.internal_not_actually_unique}
+                       md_uid = Uid.internal_not_actually_unique;
+                       md_discourse = Discourse_types.empty;
+                       md_discourse_alias = None;}
   in
   add_module_declaration_lazy ~update_summary ~check:false id presence md ?mode
     env
@@ -3149,9 +3160,9 @@ let enter_value ?check ~mode name desc env =
   in
   (id, env)
 
-let enter_type ?(long_path = false) ~scope name info env =
+let enter_type ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-  let env = store_type ~check:true ~predef:false ~long_path
+  let env = store_type ~check:true ~predef:false ~long_path:false
     id info (Shape.leaf info.type_uid) env
   in
   (id, env)
@@ -3462,9 +3473,6 @@ let initial () =
       empty
   in
   initial_env
-
-let add_type_long_path ~check ?shape id info env =
-  add_type ~check ?shape ~predef:false ~long_path:true id info env
 
 let add_type ~check ?shape id info env =
   add_type ~check ?shape ~predef:false ~long_path:false id info env
@@ -5124,12 +5132,7 @@ let report_jkind_violation_with_offender =
 
 (* Error report *)
 
-(* Open Format_doc, but Format_doc shadows [t]. *)
-open struct
-  type env = t
-  include Format_doc
-  type t = env
-end
+open Format_doc
 
 (* Forward declarations *)
 
@@ -5717,11 +5720,6 @@ let deprecated_of_alerts alerts =
 
 let deprecated_of_attributes attrs =
   deprecated_of_alerts (Builtin_attributes.alerts_of_attrs attrs)
-
-let scrape_lazy =
-  (* to be filled with Mtype.scrape_lazy *)
-  ref ((fun (_env : t) (_mty : Subst.Lazy.module_type) : Subst.Lazy.module_type ->
-    assert false))
 
 let rec short_paths_module_desc env mpath mty comp =
   let open Short_paths.Desc.Module in

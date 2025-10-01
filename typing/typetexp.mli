@@ -119,6 +119,11 @@ val transl_simple_type:
         -> ?univars:TyVarEnv.poly_univars
         -> closed:bool -> Alloc.Const.t
         -> Parsetree.core_type -> Typedtree.core_type
+val transl_simple_type_with_discourse:
+        Env.t -> new_var_jkind:jkind_initialization_choice
+        -> ?univars:TyVarEnv.poly_univars
+        -> closed:bool -> Alloc.Const.t
+        -> Parsetree.core_type -> Typedtree.core_type * Discourse_types.t
 val transl_simple_type_univars:
         Env.t -> Parsetree.core_type -> Typedtree.core_type
 val transl_simple_type_delayed
@@ -131,9 +136,10 @@ val transl_simple_type_delayed
            function that binds the type variable. *)
 val transl_type_scheme:
         Env.t -> Parsetree.core_type ->
-        Jkind_types.Sort.var list * Typedtree.core_type
+        Jkind_types.Sort.var list * Typedtree.core_type * Discourse_types.t
 val transl_type_param:
-  Env.t -> Path.t -> jkind_lr -> Parsetree.core_type -> Typedtree.core_type
+  Env.t -> Path.t -> jkind_lr -> Parsetree.core_type
+  -> Typedtree.core_type
 (* the Path.t above is of the type/class whose param we are processing;
    the level defaults to the current level. The jkind_lr is the jkind to
    use if no annotation is provided. *)

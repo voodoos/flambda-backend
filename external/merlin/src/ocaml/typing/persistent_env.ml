@@ -23,6 +23,7 @@ module CU = Compilation_unit
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
 module Consistbl = Consistbl.Make (CU.Name) (Consistbl_data)
 module Style = Misc.Style
+module String = Misc.Stdlib.String
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
@@ -354,8 +355,8 @@ let register_pers_for_short_paths penv modname ps components =
     List.exists
       (function
         | Alerts alerts ->
-          Misc.Stdlib.String.Map.mem "deprecated" alerts ||
-          Misc.Stdlib.String.Map.mem "ocaml.deprecated" alerts
+          String.Map.mem "deprecated" alerts ||
+          String.Map.mem "ocaml.deprecated" alerts
         | _ -> false)
       ps.ps_name_info.pn_import.imp_flags
   in

@@ -798,6 +798,27 @@ let type_expr s ty =
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)
 
+let type_path_opt s path =
+  (* TODO CR Ulysse it's suspicious that we hit the assert case here but it does
+     happen, notably when building the compiler itself. *)
+  match type_path s path with
+  | exception (Not_found | Assert_failure _) -> None
+  | p -> Some (Shape.Sig_component_kind.Type, p)
+
+let discourse_item s (kind, path) =
+  match (kind : Shape.Sig_component_kind.t ) with
+  | Type -> type_path_opt s path
+  | Value | Extension_constructor | Class | Class_type ->
+    Some (kind, value_path s path)
+  | Module -> Some (kind, module_path s path)
+  | Module_type ->
+    begin try Some (kind, modtype_path s path) with
+    | Module_type_path_substituted_away _ -> None
+    end
+  | _ -> Some (kind, path)
+
+let discourse s d = Discourse_types.Paths.filter_map (discourse_item s) d
+
 let label_declaration copy_scope s l =
   {
     ld_id = l.ld_id;
@@ -832,6 +853,7 @@ let constructor_declaration copy_scope s c =
     cd_loc = loc s c.cd_loc;
     cd_attributes = attrs s c.cd_attributes;
     cd_uid = c.cd_uid;
+    cd_discourse = discourse s c.cd_discourse;
   }
 
 let unsafe_mode_crossing copy_scope s loc
@@ -922,6 +944,7 @@ let rec type_declaration' copy_scope s decl =
     type_uid = decl.type_uid;
     type_unboxed_version =
       Option.map (type_declaration' copy_scope s) decl.type_unboxed_version;
+    type_discourse = discourse s decl.type_discourse;
   }
 
 let type_declaration s decl =
@@ -966,6 +989,7 @@ let class_declaration' copy_scope s decl =
     cty_loc = loc s decl.cty_loc;
     cty_attributes = attrs s decl.cty_attributes;
     cty_uid = decl.cty_uid;
+    cty_discourse = discourse s decl.cty_discourse;
   }
 
 let class_declaration s decl =
@@ -980,6 +1004,7 @@ let cltype_declaration' copy_scope s decl =
     clty_loc = loc s decl.clty_loc;
     clty_attributes = attrs s decl.clty_attributes;
     clty_uid = decl.clty_uid;
+    clty_discourse = discourse s decl.clty_discourse;
   }
 
 let cltype_declaration s decl =
@@ -1170,6 +1195,7 @@ let to_lazy =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_discourse = vd.val_discourse;
     }
   in
   To_lazy.{map_signature; map_type_expr; map_value_description}
@@ -1218,6 +1244,7 @@ let rec subst_lazy_value_description s descr =
       | _ -> descr.val_zero_alloc);
     val_attributes = attrs s descr.val_attributes;
     val_uid = descr.val_uid;
+    val_discourse = discourse s descr.val_discourse;
   }
 
 and subst_lazy_module_decl scoping s md =
@@ -1232,7 +1259,16 @@ and subst_lazy_module_decl scoping s md =
     md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
-    md_uid = md.md_uid }
+    md_uid = md.md_uid;
+    md_discourse = discourse s md.md_discourse;
+    md_discourse_alias =
+    (* TODO CR Ulysse it seems  that the longident is not actually required, we
+       should remove it. This will simplify this case. *)
+      match md.md_discourse_alias with
+      | Some (k,i) -> (match discourse_item s i with
+        | Some i -> Some (k, i)
+        | None -> None)
+      | None -> None; }
 
 and subst_lazy_modtype scoping s = function
   | Mty_ident p ->
@@ -1270,7 +1306,8 @@ and subst_lazy_modtype_decl scoping s mtd =
   { mtd_type = Option.map (subst_lazy_modtype scoping s) mtd.mtd_type;
     mtd_attributes = attrs s mtd.mtd_attributes;
     mtd_loc = loc s mtd.mtd_loc;
-    mtd_uid = mtd.mtd_uid }
+    mtd_uid = mtd.mtd_uid;
+    mtd_discourse = discourse s mtd.mtd_discourse }
 
 and subst_lazy_signature scoping s sg =
   Wrap.substitute ~compose scoping s sg
@@ -1378,6 +1415,7 @@ and from_lazy =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_discourse = vd.val_discourse;
     }
   in
   From_lazy.{map_signature; map_type_expr; map_value_description}

@@ -446,8 +446,6 @@ val add_value:
     Ident.t -> value_description -> t -> t
 val add_type:
     check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-val add_type_long_path:
-    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
@@ -521,9 +519,7 @@ val remove_last_open: Path.t -> t -> t option
 val enter_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     string -> value_description -> t -> Ident.t * t
-val enter_type:
-  ?long_path:bool -> scope:int ->
-  string -> type_declaration -> t -> Ident.t * t
+val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
 val enter_extension:
   scope:int -> rebind:bool -> string ->
   extension_constructor -> t -> Ident.t * t
@@ -731,6 +727,7 @@ val report_jkind_violation_with_offender:
    Format_doc.formatter -> Jkind.Violation.t -> unit) ref
 
 
+
 (* Forward declaration to break mutual recursion with Printtyp *)
 val shorten_module_path : (t -> Path.t -> Path.t) ref
 
@@ -779,8 +776,6 @@ type address_head =
 val address_head : address -> address_head
 
 val print_stage : Format_doc.formatter -> stage -> unit
-
-val unbound_class : Path.t
 
 (** merlin: manage internal state *)
 
