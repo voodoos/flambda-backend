@@ -388,6 +388,7 @@ in
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version uid;
       type_unboxed_version = None;
+      type_discourse = Discourse_types.empty;
     }
   in
   let decl =
@@ -407,6 +408,7 @@ in
       type_unboxed_default = false;
       type_uid = uid;
       type_unboxed_version;
+      type_discourse = Discourse_types.empty;
     }
   in
   add_type ~check:true id decl env
@@ -565,8 +567,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          raise(Error(loc, Duplicate_label name));
        all_labels := String.Set.add name !all_labels)
     lbls;
-  let mk {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
-          pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
+  let mk d {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
+            pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
          let is_atomic = Builtin_attributes.has_atomic attrs in
@@ -588,7 +590,9 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          in
          check_no_repr arg;
          let arg = Ast_helper.Typ.force_poly arg in
-         let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
+         let cty, discourse = transl_simple_type_with_discourse ~new_var_jkind
+           env ?univars ~closed Mode.Alloc.Const.legacy arg in
+         Discourse_types.union d discourse,
          {ld_id = Ident.create_local name.txt;
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
@@ -597,7 +601,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
       )
   in
-  let lbls = List.map mk lbls in
+  let discourse, lbls = List.fold_left_map mk Discourse_types.empty lbls in
   let lbls' =
     List.map
       (fun ld ->
@@ -620,20 +624,21 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          }
       )
       lbls in
-  lbls, lbls'
+  lbls, lbls', discourse
 
 let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
-  let mk arg =
-    let cty =
-      transl_simple_type ~new_var_jkind env ?univars ~closed
+  let mk acc_discourse arg =
+    let cty, discourse =
+      transl_simple_type_with_discourse ~new_var_jkind env ?univars ~closed
         Mode.Alloc.Const.legacy arg.pca_type
     in
     let gf =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
+    Discourse_types.union acc_discourse discourse,
     {ca_modalities = gf; ca_type = cty; ca_loc = arg.pca_loc}
   in
-  let tyl_gfl = List.map mk cal in
+  let discourse, tyl_gfl = List.fold_left_map mk Discourse_types.empty cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->
     if extension then begin
       constrain_to_representable
@@ -648,23 +653,24 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
             (* Updated by [update_constructor_arguments_sorts] *)
     }) tyl_gfl
   in
-  tyl_gfl, tyl_gfl'
+  tyl_gfl, tyl_gfl', discourse
 
 let transl_constructor_arguments ~new_var_jkind ~unboxed
   env loc univars closed ~extension = function
   | Pcstr_tuple l ->
-      let flds, flds' =
+      let flds, flds', discourse =
         transl_types_gf ~new_var_jkind ~extension
           env loc univars closed l (Cstr_tuple { unboxed })
       in
-      Types.Cstr_tuple flds', Cstr_tuple flds
+      Types.Cstr_tuple flds', Cstr_tuple flds, discourse
   | Pcstr_record l ->
-      let lbls, lbls' =
+      let lbls, lbls', discourse =
         transl_labels ~record_form:Legacy ~new_var_jkind ~extension
           env univars closed l (Inlined_record { unboxed })
       in
       Types.Cstr_record lbls',
-      Cstr_record lbls
+      Cstr_record lbls,
+      discourse
 
 (* Note that [make_constructor] does not fill in the [ld_jkind] field of any
    computed record types, because it's called too early in the translation of a
@@ -677,18 +683,18 @@ let make_constructor
   let tvars = List.map (fun (v, l) -> v.txt, l) svars in
   match sret_type with
   | None ->
-      let args, targs =
+      let args, targs, discourse =
         transl_constructor_arguments ~new_var_jkind:Any ~unboxed ~extension
           env loc None true sargs
       in
-        tvars, targs, None, args, None
+      tvars, targs, None, args, None, discourse
   | Some sret_type ->
       (* if it's a generalized constructor we must first narrow and
          then widen so as to not introduce any new constraints *)
       (* narrow and widen are now invoked through with_local_scope *)
       TyVarEnv.with_local_scope begin fun () ->
       let closed = svars <> [] in
-      let targs, tret_type, args, ret_type, _univars =
+      let targs, tret_type, args, ret_type, _univars, discourse =
         Ctype.with_local_level_generalize_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
@@ -697,13 +703,13 @@ let make_constructor
               (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in
           let univars = if closed then Some univar_list else None in
-          let args, targs =
+          let args, targs, args_discourse =
             transl_constructor_arguments ~new_var_jkind:Sort ~unboxed ~extension
               env loc univars closed sargs
           in
-          let tret_type =
-            transl_simple_type ~new_var_jkind:Sort env ?univars ~closed Mode.Alloc.Const.legacy
-              sret_type
+          let tret_type, tret_discourse =
+            transl_simple_type_with_discourse ~new_var_jkind:Sort env ?univars
+              ~closed Mode.Alloc.Const.legacy sret_type
           in
           let ret_type = tret_type.ctyp_type in
           (* TODO add back type_path as a parameter ? *)
@@ -722,9 +728,10 @@ let make_constructor
                            Constraint_failed(
                            env, Errortrace.unification_error ~trace)))
           end;
-          (targs, tret_type, args, ret_type, univar_list)
+          let discourse = Discourse_types.union args_discourse tret_discourse in
+          (targs, tret_type, args, ret_type, univar_list, discourse)
         end
-        ~before_generalize: begin fun (_, _, args, ret_type, univars) ->
+        ~before_generalize: begin fun (_, _, args, ret_type, univars, _) ->
           Btype.iter_type_expr_cstr_args Ctype.generalize args;
           Ctype.generalize ret_type;
           let _vars = TyVarEnv.instance_poly_univars env loc univars in
@@ -733,7 +740,7 @@ let make_constructor
           set_level ret_type;
         end
       in
-      tvars, targs, Some tret_type, args, Some ret_type
+      tvars, targs, Some tret_type, args, Some ret_type, discourse
       end
 
 let verify_unboxed_attr unboxed_attr sdecl =
@@ -928,10 +935,19 @@ let transl_declaration env sdecl (id, uid) =
   let path = Path.Pident id in
   let tparams = make_params env path sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
-  let cstrs = List.map
-    (fun (sty, sty', loc) ->
-      transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy sty,
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
+  let discourse, cstrs = List.fold_left_map
+      (fun acc_d (sty, sty', loc) ->
+          let ct, d =
+            transl_simple_type_with_discourse ~new_var_jkind:Any env
+              ~closed:false Mode.Alloc.Const.legacy sty
+          in
+          let ct', d' =
+            transl_simple_type_with_discourse ~new_var_jkind:Sort env
+              ~closed:false Mode.Alloc.Const.legacy sty'
+          in
+          Discourse_types.(union (union acc_d d) d'),
+          (ct, ct', loc))
+      Discourse_types.empty
     sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
@@ -991,18 +1007,21 @@ let transl_declaration env sdecl (id, uid) =
         Some jkind, annot
     | None -> None, None
   in
-  let (tman, man) = match sdecl.ptype_manifest with
-      None -> None, None
+  let (tman, man, discourse) = match sdecl.ptype_manifest with
+      None -> None, None, discourse
     | Some sty ->
       let no_row = not (is_fixed_type sdecl) in
-      let cty = transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.Alloc.Const.legacy sty in
-      Some cty, Some cty.ctyp_type
+      let cty, d =
+        transl_simple_type_with_discourse ~new_var_jkind:Any env ~closed:no_row
+        Mode.Alloc.Const.legacy sty
+      in
+      Some cty, Some cty.ctyp_type, Discourse_types.union discourse d
   in
   (* jkind_default is the jkind to use for now as the type_jkind when there
      is no annotation and no manifest.
      See Note [Default jkinds in transl_declaration].
   *)
-  let (tkind, kind, jkind_default) =
+  let (tkind, kind, jkind_default, type_discourse) =
     match sdecl.ptype_kind with
       (* CR layouts v3.5: this is a hack to allow re-exporting the definition
          of ['a or_null], including constructors, even if one can't define
@@ -1023,13 +1042,14 @@ let transl_declaration env sdecl (id, uid) =
           in
           let type_kind = Predef.or_null_kind param in
           let jkind = Predef.or_null_jkind param in
-          Ttype_abstract, type_kind, jkind
+          Ttype_abstract, type_kind, jkind, discourse
       | (Ptype_variant _ | Ptype_record _ | Ptype_record_unboxed_product _
         | Ptype_open) when or_null_reexport ->
         raise (Error (sdecl.ptype_loc, Non_abstract_reexport path))
       | Ptype_abstract ->
         Ttype_abstract, Type_abstract Definition,
-        Jkind.Builtin.value ~why:Default_type_jkind
+        Jkind.Builtin.value ~why:Default_type_jkind,
+        discourse
       | Ptype_variant scstrs ->
         if or_null then begin
           check_or_null_variant_shape path params sdecl scstrs;
@@ -1065,10 +1085,10 @@ let transl_declaration env sdecl (id, uid) =
             (List.filter (fun cd -> cd.pcd_args <> Pcstr_tuple []) scstrs)
            > (Config.max_tag + 1) then
           raise(Error(sdecl.ptype_loc, Too_many_constructors));
-        let make_cstr scstr =
+        let make_cstr acc_discourse scstr =
           let name = Ident.create_local scstr.pcd_name.txt in
           let attributes = scstr.pcd_attributes in
-          let tvars, targs, tret_type, args, ret_type =
+          let tvars, targs, tret_type, args, ret_type, cd_discourse =
             make_constructor ~unboxed:unbox ~extension:false env scstr.pcd_loc
               ~cstr_path:(Path.Pident name) ~type_path:path params
               scstr.pcd_vars scstr.pcd_args scstr.pcd_res
@@ -1089,15 +1109,20 @@ let transl_declaration env sdecl (id, uid) =
               cd_res = ret_type;
               cd_loc = scstr.pcd_loc;
               cd_attributes = attributes;
-              cd_uid = tcstr.cd_uid }
+              cd_uid = tcstr.cd_uid;
+              cd_discourse }
           in
-            tcstr, cstr
+          let discourse = Discourse_types.union acc_discourse cd_discourse in
+          (discourse, (tcstr, cstr))
         in
-        let make_cstr scstr =
+        let make_cstr acc scstr =
           Builtin_attributes.warning_scope scstr.pcd_attributes
-            (fun () -> make_cstr scstr)
+            (fun () -> make_cstr acc scstr)
         in
-        let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
+        let discourse, cstrs =
+          List.fold_left_map make_cstr discourse scstrs
+        in
+        let tcstrs, cstrs = List.split cstrs in
         let rep, jkind =
           if or_null then
             match params with
@@ -1129,9 +1154,10 @@ let transl_declaration env sdecl (id, uid) =
             ),
           Jkind.for_non_float ~why:Boxed_variant
         in
-          Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
+          Ttype_variant tcstrs, Type_variant (cstrs, rep, None),
+          jkind, discourse
       | Ptype_record lbls ->
-          let lbls, lbls' =
+          let lbls, lbls', lbls_discourse =
             transl_labels ~record_form:Legacy ~new_var_jkind:Any
               env None true lbls (Record { unboxed = unbox }) ~extension:false
           in
@@ -1144,11 +1170,13 @@ let transl_declaration env sdecl (id, uid) =
               Record_dummy { represent_as_float_array; flatten_floats },
               Jkind.for_non_float ~why:Boxed_record
           in
-          Ttype_record lbls, Type_record(lbls', rep, None), jkind
+          let discourse = Discourse_types.union discourse lbls_discourse in
+          Ttype_record lbls, Type_record(lbls', rep, None), jkind,
+          discourse
       | Ptype_record_unboxed_product lbls ->
           Language_extension.assert_enabled ~loc:sdecl.ptype_loc Layouts
             Language_extension.Stable;
-          let lbls, lbls' =
+          let lbls, lbls', lbls_discourse =
             transl_labels ~record_form:Unboxed_product ~new_var_jkind:Any
               env None true lbls Record_unboxed_product ~extension:false
           in
@@ -1161,11 +1189,13 @@ let transl_declaration env sdecl (id, uid) =
           let jkind =
             Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
           in
+          let discourse = Discourse_types.union discourse lbls_discourse in
           Ttype_record_unboxed_product lbls,
-          Type_record_unboxed_product(lbls', rep, None), jkind
+          Type_record_unboxed_product(lbls', rep, None), jkind, discourse
       | Ptype_open ->
         Ttype_open, Type_open,
-        Jkind.for_non_float ~why:Extensible_variant
+        Jkind.for_non_float ~why:Extensible_variant,
+        discourse
       in
     let jkind =
     (* - If there's an annotation, we use that. It's checked against a kind in
@@ -1230,6 +1260,7 @@ let transl_declaration env sdecl (id, uid) =
         type_unboxed_version = None;
         (* Unboxed versions are computed after all declarations have been
            translated, in [derive_unboxed_versions] *)
+        type_discourse;
       } in
   (* Check constraints *)
     List.iter
@@ -1431,6 +1462,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_unboxed_default = false;
         type_uid = Uid.unboxed_version decl.type_uid;
         type_unboxed_version = None;
+        type_discourse = Discourse_types.empty;
       }
 
 let derive_unboxed_versions decls env =
@@ -3790,7 +3822,7 @@ let transl_type_decl env rec_flag sdecl_list =
 (* Translating type extensions *)
 let transl_extension_constructor_decl
       env type_path typext_params loc id svars sargs sret_type =
-  let tvars, targs, tret_type, args, ret_type =
+  let tvars, targs, tret_type, args, ret_type, _discourse =
     make_constructor env loc
       ~cstr_path:(Pident id) ~type_path ~unboxed:false ~extension:true
       typext_params svars sargs sret_type
@@ -4595,7 +4627,9 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
-  let lpoly, cty = Typetexp.transl_type_scheme env valdecl.pval_type in
+  let lpoly, cty, val_discourse =
+    Typetexp.transl_type_scheme env valdecl.pval_type
+  in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
     | Ok sort -> sort
@@ -4659,6 +4693,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+        val_discourse;
       }
   | [] ->
       raise (Error(valdecl.pval_loc, Val_in_structure))
@@ -4704,6 +4739,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+        val_discourse;
       }
   in
   let (id, newenv) =
@@ -4843,6 +4879,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_unboxed_default = false;
           type_uid = Uid.unboxed_version type_uid;
           type_unboxed_version = None;
+          type_discourse = Discourse_types.empty;
         }
       | { type_unboxed_version = None ; _ } ->
         None
@@ -4882,6 +4919,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_unboxed_default;
       type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
       type_unboxed_version;
+      type_discourse = Discourse_types.empty;
     }
   in
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
@@ -4947,7 +4985,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
             type_variance;
             type_separability;
           })
-        new_sig_decl.type_unboxed_version
+        new_sig_decl.type_unboxed_version;
+      type_discourse = Discourse_types.empty;
     } in
   {
     typ_id = id;
@@ -4988,6 +5027,7 @@ let transl_package_constraint ~loc ty =
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
     type_unboxed_version = None;
+    type_discourse = Discourse_types.empty;
   }
 
 (* Approximate a type declaration: just make all types abstract *)
@@ -5030,7 +5070,9 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_unboxed_default = false;
           type_uid = Uid.internal_not_actually_unique;
           type_unboxed_version = None;
+          type_discourse = Discourse_types.empty;
         };
+      type_discourse = Discourse_types.empty;
     }
   end
 
