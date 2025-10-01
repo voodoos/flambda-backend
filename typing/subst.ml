@@ -628,6 +628,7 @@ let constructor_declaration copy_scope s c =
     cd_loc = loc s c.cd_loc;
     cd_attributes = attrs s c.cd_attributes;
     cd_uid = c.cd_uid;
+    cd_discourse = c.cd_discourse;
   }
 
 let unsafe_mode_crossing copy_scope s loc
@@ -688,6 +689,7 @@ let rec type_declaration' copy_scope s decl =
     type_uid = decl.type_uid;
     type_unboxed_version =
       Option.map (type_declaration' copy_scope s) decl.type_unboxed_version;
+    type_discourse = decl.type_discourse;
   }
 
 let type_declaration s decl =
@@ -732,6 +734,7 @@ let class_declaration' copy_scope s decl =
     cty_loc = loc s decl.cty_loc;
     cty_attributes = attrs s decl.cty_attributes;
     cty_uid = decl.cty_uid;
+    cty_discourse = decl.cty_discourse;
   }
 
 let class_declaration s decl =
@@ -746,6 +749,7 @@ let cltype_declaration' copy_scope s decl =
     clty_loc = loc s decl.clty_loc;
     clty_attributes = attrs s decl.clty_attributes;
     clty_uid = decl.clty_uid;
+    clty_discourse = decl.clty_discourse;
   }
 
 let cltype_declaration s decl =
@@ -955,6 +959,7 @@ let rec subst_lazy_value_description s descr =
       | _ -> descr.val_zero_alloc);
     val_attributes = attrs s descr.val_attributes;
     val_uid = descr.val_uid;
+    val_discourse = descr.val_discourse;
   }
 
 and subst_lazy_module_decl scoping s md =
@@ -969,7 +974,8 @@ and subst_lazy_module_decl scoping s md =
     md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
-    md_uid = md.md_uid }
+    md_uid = md.md_uid;
+    md_discourse = md.md_discourse; }
 
 and subst_lazy_modtype scoping s = function
   | Mty_ident p ->
@@ -1004,7 +1010,8 @@ and subst_lazy_modtype_decl scoping s mtd =
   { mtd_type = Option.map (subst_lazy_modtype scoping s) mtd.mtd_type;
     mtd_attributes = attrs s mtd.mtd_attributes;
     mtd_loc = loc s mtd.mtd_loc;
-    mtd_uid = mtd.mtd_uid }
+    mtd_uid = mtd.mtd_uid;
+    mtd_discourse = mtd.mtd_discourse }
 
 and subst_lazy_signature scoping s sg =
   Wrap.substitute ~compose scoping s sg
