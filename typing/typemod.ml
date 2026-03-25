@@ -248,7 +248,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
 let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
   let path, mode, newenv = Env.open_signature ~loc ~used_slot ~toplevel ovf lid env in
   Discourse.use_module env lid path;
-  Discourse.open_module ~env ~newenv path;
+  Discourse.open_module env path;
   path, mode, newenv
 
 let initial_env ~loc ~initially_opened_module
@@ -1357,6 +1357,7 @@ and approx_module_declaration env pmd =
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
     md_discourse = Discourse_types.empty;
+    md_discourse_alias = None;
   }
 
 and approx_sig env {psg_items; _} = approx_sig_items env psg_items
@@ -1897,6 +1898,7 @@ and transl_modtype_aux env smty =
                     md_loc = param.loc;
                     md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
                     md_discourse;
+                    md_discourse_alias = None;
                   }
                 in
                 Env.enter_module_declaration ~scope ~arg:true name Mp_present
@@ -1905,8 +1907,8 @@ and transl_modtype_aux env smty =
               (* TODO should we add functor parameters to the discourse ? *)
               Some id, newenv
           in
-          Named (id, param, arg), Types.Named (id, arg.mty_type), newenv,
-          md_discourse
+          Named (id, param, arg), Types.Named (id, arg.mty_type),
+          newenv, md_discourse
       in
       let res, discourse = transl_modtype newenv sres in
       mkmty (Tmty_functor (t_arg, res))
@@ -2159,6 +2161,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           md_loc=pmd.pmd_loc;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           md_discourse;
+          md_discourse_alias = None;
         }
         in
         let id, newenv =
@@ -2169,7 +2172,6 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
               Env.enter_module_declaration ~scope name pres md
                 ~mode:md_mode env
             in
-            Discourse.define_module newenv (Lident name);
             Signature_names.check_module names pmd.pmd_name.loc id;
             Some id, newenv
         in
@@ -2208,6 +2210,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
               md_discourse;
+              md_discourse_alias = None;
             }
         in
         let pres =
@@ -2219,7 +2222,6 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           Env.enter_module_declaration ~scope pms.pms_name.txt pres md
             ~mode:md_mode env
         in
-        Discourse.define_module newenv (Lident pms.pms_name.txt);
         let info =
           `Substituted_away (Subst.add_module id path Subst.identity)
         in
@@ -2246,7 +2248,6 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           ) tdecls
         in
         List.iter (fun (id, md, _uid) ->
-          Discourse.define_module newenv (Lident (Ident.name id));
           Signature_names.check_module names md.md_loc id;
         ) decls;
         let sig_items =
@@ -2257,6 +2258,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
                      md_loc = md.md_loc;
                      md_uid = uid;
                      md_discourse = Discourse_types.empty (*TODO*);
+                     md_discourse_alias = None;
                     } in
             Sig_module(id, Mp_present, d, rs, Exported))
             decls []
@@ -2395,7 +2397,7 @@ and transl_modtype_decl_aux env
   in
   let scope = Ctype.create_scope () in
   let (id, newenv) = Env.enter_modtype ~scope pmtd_name.txt decl env in
-  Discourse.define_modtype newenv (Lident pmtd_name.txt);
+  Discourse_types.add_ident Module_type id;
   let mtd =
     {
      mtd_id=id;
@@ -2471,7 +2473,8 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
              md_loc = pmd.pmd_loc;
              md_attributes = pmd.pmd_attributes;
              md_uid;
-             md_discourse = Discourse_types.empty; }
+             md_discourse = Discourse_types.empty;
+             md_discourse_alias = None }
          in
          let id_shape =
            Option.map (fun id -> id, Shape.var md_uid id) id
@@ -2667,7 +2670,8 @@ let check_recmodule_inclusion env bindings =
       let bindings1 =
         List.map
           (fun (id, _name, _mty_decl, _modl,
-                mty_actual, _mmode, _attrs, _loc, shape, _uid, _discourse) ->
+                mty_actual, _mmode, _attrs, _loc,
+                shape, _uid, _discourse, _discourse_alias) ->
              let ids =
                Option.map
                  (fun id -> (id, Ident.create_scoped ~scope (Ident.name id))) id
@@ -2704,7 +2708,7 @@ let check_recmodule_inclusion env bindings =
          and insert coercion if needed *)
       let check_inclusion
             (id, name, mty_decl, modl, mty_actual, mode_decl, attrs, loc, shape
-            , uid, _discourse) =
+            , uid, _discourse, _discourse_alias) =
         let mty_decl' = Subst.modtype (Rescope scope) s mty_decl.mty_type
         and mty_actual' = subst_and_strengthen scope s id mty_actual in
         let mode_actual, locks = modl.mod_mode in
@@ -2955,10 +2959,14 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       let path, mode_with_locks =
         Env.lookup_module_path ~load:(not alias) ~loc:smod.pmod_loc lid.txt env
       in
+      (* TODO We should not use (U) if alias (only D) ! *)
       Discourse.use_module env lid path;
       let me, shape =  type_module_path_aux ~alias ~hold_locks
         sttn env path mode_with_locks lid smod in
-      me, shape, Discourse_types.singleton lid.txt (Module, path)
+      let discourse_item = (Sig_component_kind.Module, path) in
+      let discourse_alias = Some (lid, discourse_item) in
+      me, shape,
+      Discourse_types.singleton lid.txt discourse_item, discourse_alias
   | Pmod_structure sstr ->
       Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
@@ -2977,7 +2985,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         wrap_constraint_with_shape env false md
           (Mty_signature sg') mode shape Tmodtype_implicit
       in
-      md, shape, empty_discourse
+      md, shape, empty_discourse, None
   | Pmod_functor(arg_opt, sbody) ->
       let _, mode = register_allocation () in
       Option.iter (fun x -> Value.submode mode x |> ignore) expected_mode;
@@ -3004,6 +3012,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
                   md_loc = param.loc;
                   md_uid;
                   md_discourse = mtd_discourse;
+                  md_discourse_alias = None;
                 }
               in
               let id = Ident.create_scoped ~scope name in
@@ -3020,7 +3029,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       let expected_mode =
         alloc_as_value Types.functor_res_mode |> Value.disallow_left
       in
-      let body, body_shape, discourse =
+      let body, body_shape, discourse, _discourse_alias =
         type_module true funct_body None newenv ~expected_mode sbody
       in
       let body_mode = mode_without_locks_exn body.mod_mode in
@@ -3036,7 +3045,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
       Shape.abs funct_shape_param body_shape,
-      discourse
+      discourse, None
   | Pmod_apply _ | Pmod_apply_unit _ ->
       type_application smod.pmod_loc sttn funct_body env smod
   | Pmod_constraint(sarg, smty, smode) ->
@@ -3046,7 +3055,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         |> Typemode.transl_mode_annots
         |> new_mode_var_from_annots
       in
-      let arg, arg_shape, arg_discourse =
+      let arg, arg_shape, arg_discourse, _discourse_alias =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
           anchor env ~expected_mode:(mode |> Value.disallow_left) sarg
       in
@@ -3073,7 +3082,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         mod_attributes = smod.pmod_attributes;
       },
       final_shape,
-      Discourse_types.union arg_discourse discourse
+      Discourse_types.union arg_discourse discourse, None
   | Pmod_unpack sexp ->
       let mode = Value.newvar () in
       let exp =
@@ -3110,7 +3119,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
       Shape.leaf_for_unpack,
-      empty_discourse
+      empty_discourse, None
   | Pmod_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
   | Pmod_instance glob ->
@@ -3131,7 +3140,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       let md, shape =
         type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks
           lid smod in
-      md, shape, empty_discourse
+      md, shape, empty_discourse, None
 
 and type_module_path_aux ~alias ~hold_locks sttn env path
   (mode, locks) (lid : _ loc) smod =
@@ -3181,7 +3190,7 @@ and type_application loc strengthen funct_body env smod =
   let rec extract_application funct_body env discourse sargs smod =
     match smod.pmod_desc with
     | Pmod_apply(f, sarg) ->
-        let arg, shape, discourse =
+        let arg, shape, discourse, _discourse_alias =
           type_module_maybe_hold_locks ~hold_locks:true true funct_body None env
             sarg
         in
@@ -3210,7 +3219,7 @@ and type_application loc strengthen funct_body env smod =
   let sfunct, args, discourse =
     extract_application funct_body env Discourse_types.empty [] smod
   in
-  let funct, funct_shape, discourse' =
+  let funct, funct_shape, discourse', discourse_alias =
     let has_path { arg } = match arg with
       | None | Some { path = None } -> false
       | Some { path = Some _ } -> true
@@ -3222,7 +3231,7 @@ and type_application loc strengthen funct_body env smod =
     (type_one_application ~ctx:(loc, sfunct, funct, args) funct_body env)
     (funct, funct_shape) args
   in
-  me, shape, Discourse_types.union discourse discourse'
+  me, shape, Discourse_types.union discourse discourse', discourse_alias
 
 and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
@@ -3365,14 +3374,16 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     } in
     open_descr, Mode.Value.(max |> disallow_right), [], newenv
   | _ ->
-    let md, mod_shape, _discourse = type_module true funct_body None env od.popen_expr in
+    let md, mod_shape, _discourse, _discourse_alias =
+      type_module true funct_body None env od.popen_expr
+    in
     let mode = mode_without_locks_exn md.mod_mode in
     let scope = Ctype.create_scope () in
     let sg, newenv =
       Env.enter_signature ~scope ~mod_shape
         (extract_sig_open env md.mod_loc md.mod_type) ~mode env
     in
-    let () = Discourse.define_signature newenv sg in
+    let () = Discourse.define_signature sg in
     let info, visibility =
       match toplevel with
       | Some false | None -> Some `From_open, Hidden
@@ -3413,7 +3424,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
-    let modl, modl_shape, _discourse =
+    let modl, modl_shape, _discourse, discourse_alias =
       Builtin_attributes.warning_scope sincl.pincl_attributes
         (fun () -> type_module true funct_body None env smodl)
     in
@@ -3436,7 +3447,25 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
       Env.enter_signature_and_shape ~scope ~parent_shape:shape_map
         modl_shape sg ~mode env
     in
-    let () = Discourse.define_signature new_env sg in
+    let sg =
+      match discourse_alias with
+      | None -> sg
+      | Some (lid, (m, path)) ->
+        List.map (function
+          | Sig_module (id, pres, decl, rec_status, visibility) ->
+            let md_discourse_alias =
+              let name = Ident.name id in
+              let lid = { txt = Longident.Ldot (lid.txt, name);
+                          loc = Location.ghostify lid.Location.loc } in
+              let path = Path.Pdot (path, name) in
+              Some (lid, (m, path))
+            in
+            let decl = { decl with md_discourse_alias } in
+            Sig_module (id, pres, decl, rec_status, visibility)
+          | sig_item -> sig_item)
+          sg
+    in
+    let () = Discourse.define_signature sg in
     let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
@@ -3552,6 +3581,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         in
         let shape_map = List.fold_left2
           (fun map { typ_id; _} shape ->
+            Discourse.define_type typ_id;
             Shape.Map.add_type map typ_id shape)
           shape_map
           decls
@@ -3596,7 +3626,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                   } ->
         let outer_scope = Ctype.get_current_level () in
         let scope = Ctype.create_scope () in
-        let modl, md_shape, md_discourse =
+        let modl, md_shape, md_discourse, md_discourse_alias =
           Builtin_attributes.warning_scope attrs
             (fun () ->
                type_module ~alias:true true funct_body
@@ -3618,6 +3648,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             md_loc = pmb_loc;
             md_uid;
             md_discourse;
+            md_discourse_alias;
           }
         in
         let md_shape = Shape.set_uid_if_none md_shape md_uid in
@@ -3630,7 +3661,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             let id, e = Env.enter_module_declaration
               ~scope ~shape:md_shape name pres md ~mode:md_mode env
             in
-            Discourse.define_module e (Lident name);
+            Discourse.define_module md id;
             Signature_names.check_module names pmb_loc id;
             Some id, e,
             [Sig_module(id, pres,
@@ -3640,6 +3671,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                          md_loc = pmb_loc;
                          md_uid;
                          md_discourse;
+                         md_discourse_alias;
                         }, Trec_not, Exported)]
         in
         let shape_map = match id with
@@ -3684,7 +3716,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           List.map2
             (fun ({md_id=id; md_type=mty}, mode, uid, _prev_shape)
                  (name, _, _, smodl, attrs, loc) ->
-               let modl, shape, discourse =
+               let modl, shape, discourse, discourse_alias =
                  Builtin_attributes.warning_scope attrs
                    (fun () ->
                       type_module true funct_body (anchor_recmodule id)
@@ -3695,12 +3727,12 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                  enrich_module_type anchor name.txt modl.mod_type newenv
                in
                (id, name, mty, modl, mty', Option.get mode, attrs, loc, shape,
-                uid, discourse))
+                uid, discourse, discourse_alias))
             decls sbind in
         let newenv = (* allow aliasing recursive modules from outside *)
           List.fold_left
             (fun env (id_opt, _, mty, _, _, mode, attrs, loc, shape, uid,
-               discourse) ->
+               discourse, discourse_alias) ->
                match id_opt with
                | None -> env
                | Some id ->
@@ -3712,6 +3744,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                        md_loc = loc;
                        md_uid = uid;
                        md_discourse = discourse;
+                       md_discourse_alias = discourse_alias;
                      }
                    in
                    Env.add_module_declaration ~check:true ~shape
@@ -3744,6 +3777,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                 md_loc=mb.mb_loc;
                 md_uid = uid;
                 md_discourse = Discourse_types.empty;
+                md_discourse_alias = None;
               }, rs, Exported))
            mbs [],
         shape_map,
@@ -3753,6 +3787,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         let newenv, mtd, decl = transl_modtype_decl env pmtd in
         Signature_names.check_modtype names pmtd.pmtd_loc mtd.mtd_id;
         let id = mtd.mtd_id in
+        Discourse.define_modtype id;
         let map = Shape.Map.add_module_type shape_map id decl.mtd_uid in
         Tstr_modtype mtd, [Sig_modtype (id, decl, Exported)], map, newenv
     | Pstr_open sod ->
@@ -3941,7 +3976,7 @@ let type_module_type_of env smod =
           mod_attributes = smod.pmod_attributes;
           mod_loc = smod.pmod_loc }
     | _ ->
-        let me, _shape, _discourse = type_module env smod in
+        let me, _shape, _discourse, _discourse_alias = type_module env smod in
         me
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
@@ -3999,7 +4034,7 @@ let type_package env m p fl =
     Typetexp.TyVarEnv.with_local_scope begin fun () ->
       (* type the module and create a scope in a raised level *)
       Ctype.with_local_level begin fun () ->
-        let modl, _mod_shape, _discourse =
+        let modl, _mod_shape, _discourse, _discourse_alias =
           type_module_maybe_hold_locks ~hold_locks:true env m
         in
         let scope = Ctype.create_scope () in
@@ -4441,6 +4476,7 @@ let package_signatures units =
           md_loc=Location.none;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           md_discourse = Discourse_types.empty;
+          md_discourse_alias = None;
         }
       in
       Sig_module(newid, Mp_present, md, Trec_not, Exported))
