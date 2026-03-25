@@ -40,6 +40,7 @@ let shape = ref false
 let index = ref false
 let decls = ref false
 let uid_deps = ref false
+let discourse = ref false
 
 module Magic_number = Misc.Magic_number
 module String = Misc.Stdlib.String
@@ -153,6 +154,28 @@ let print_cma_infos (lib : Cmo_format.library) =
   List.iter print_spaced_string (List.rev lib.lib_dllibs);
   printf "\n";
   List.iter print_cmo_infos lib.lib_units
+
+let print_discourse_cmi (cmi : Cmi_format.cmi_infos_lazy) =
+  let sg = Subst.Lazy.force_signature_once cmi.cmi_sign in
+  let print_item_discourse id (d : Discourse_types.t) =
+    Format.printf "@[<hov 2>%a:@ %a@]@\n" Ident.print id Discourse_types.pp d
+  in
+  List.iter (fun (item : Subst.Lazy.signature_item) ->
+    match item with
+    | Sig_value (id, vd, _) ->
+      print_item_discourse id vd.val_discourse
+    | Sig_type (id, td, _, _) ->
+      print_item_discourse id td.type_discourse
+    | Sig_typext _ -> ()
+    | Sig_module (id, _, md, _, _) ->
+      print_item_discourse id md.md_discourse
+    | Sig_modtype (id, mtd, _) ->
+      print_item_discourse id mtd.mtd_discourse
+    | Sig_class (id, cd, _, _) ->
+      print_item_discourse id cd.cty_discourse
+    | Sig_class_type (id, ctd, _, _) ->
+      print_item_discourse id ctd.clty_discourse)
+    sg
 
 let print_cmi_infos name crcs kind params global_name_bindings =
   if not !quiet then begin
@@ -496,7 +519,11 @@ let dump_obj_by_kind filename ic obj_kind =
          | Some cmi ->
             print_cmi_infos cmi.Cmi_format.cmi_name cmi.Cmi_format.cmi_crcs
               cmi.Cmi_format.cmi_kind cmi.Cmi_format.cmi_params
-              cmi.Cmi_format.cmi_globals
+              cmi.Cmi_format.cmi_globals;
+            if !discourse then begin
+              printf "Discourse:\n";
+              print_discourse_cmi cmi
+            end
        end;
        begin match cmt with
          | None -> ()
@@ -607,6 +634,8 @@ let arg_list = [
     " Print a list of all declarations in the module";
   "-uid-deps", Arg.Set uid_deps,
     " Print the declarations' uids dependencies of the module";
+  "-discourse", Arg.Set discourse,
+    " Print discourse information from .cmi signatures";
   "-null-crc", Arg.Set no_crc, " Print a null CRC for imported interfaces";
   "-args", Arg.Expand Arg.read_arg,
      "<file> Read additional newline separated command line arguments \n\
