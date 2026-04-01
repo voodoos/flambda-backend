@@ -156,26 +156,60 @@ let print_cma_infos (lib : Cmo_format.library) =
   List.iter print_cmo_infos lib.lib_units
 
 let print_discourse_cmi (cmi : Cmi_format.cmi_infos_lazy) =
-  let sg = Subst.Lazy.force_signature_once cmi.cmi_sign in
-  let print_item_discourse id (d : Discourse_types.t) =
-    Format.printf "@[<hov 2>%a:@ %a@]@\n" Ident.print id Discourse_types.pp d
+  let pp_alias fmt ({ Location.txt; _ }, (_, path)) =
+    Format.fprintf fmt "alias: %a [%a]@ " Pprintast.longident txt Path.print path
   in
-  List.iter (fun (item : Subst.Lazy.signature_item) ->
+  let rec print_sig_item ?prefix ppf (item : Types.signature_item) =
+    let lid id = match prefix with
+      | None -> Longident.Lident (Ident.name id)
+      | Some lid -> Longident.Ldot (lid, Ident.name id)
+    in
     match item with
     | Sig_value (id, vd, _) ->
-      print_item_discourse id vd.val_discourse
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+         Pprintast.longident prefix Discourse_types.pp vd.val_discourse
     | Sig_type (id, td, _, _) ->
-      print_item_discourse id td.type_discourse
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+        Pprintast.longident prefix Discourse_types.pp td.type_discourse
     | Sig_typext _ -> ()
     | Sig_module (id, _, md, _, _) ->
-      print_item_discourse id md.md_discourse
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a%a@]@ %a"
+        Pprintast.longident prefix
+        (Format.pp_print_option pp_alias) md.md_discourse_alias
+        Discourse_types.pp md.md_discourse
+        (print_modtype prefix) md.md_type
     | Sig_modtype (id, mtd, _) ->
-      print_item_discourse id mtd.mtd_discourse
+      let prefix = lid id in
+      begin match mtd with
+      | { mtd_type = Some mt; _ } ->
+        Format.fprintf ppf "@[<2>%a:@ %a@]@ %a"
+          Pprintast.longident prefix Discourse_types.pp mtd.mtd_discourse
+          (print_modtype prefix) mt
+      | _ ->
+        Format.fprintf ppf "@[<2>%a:@ %a@]"
+          Pprintast.longident prefix Discourse_types.pp mtd.mtd_discourse
+      end
     | Sig_class (id, cd, _, _) ->
-      print_item_discourse id cd.cty_discourse
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+        Pprintast.longident prefix Discourse_types.pp cd.cty_discourse
     | Sig_class_type (id, ctd, _, _) ->
-      print_item_discourse id ctd.clty_discourse)
-    sg
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+        Pprintast.longident prefix Discourse_types.pp ctd.clty_discourse
+  and print_modtype prefix ppf (mty : Types.module_type) =
+    match mty with
+    | Mty_signature items ->
+      Format.pp_print_list (print_sig_item ~prefix) ppf items
+    | Mty_functor _ | Mty_strengthen _
+    | Mty_ident _ | Mty_alias _ -> ()
+  in
+  let sg = Subst.Lazy.force_signature cmi.cmi_sign in
+  Format.printf "@[<v>%a@]@."
+    (Format.pp_print_list print_sig_item) sg
 
 let print_cmi_infos name crcs kind params global_name_bindings =
   if not !quiet then begin
