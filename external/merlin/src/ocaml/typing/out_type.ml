@@ -598,6 +598,11 @@ let rec tree_of_path namespace = function
           Oide_hash (tree_of_path namespace p)
     end
 
+let rec tree_of_lid = function
+  | Lident printed_name -> Oide_ident { printed_name }
+  | Ldot(l, s) ->  Oide_dot (tree_of_lid l.txt, s.txt)
+  | Lapply(l1, l2) -> Oide_apply (tree_of_lid l1.txt, tree_of_lid l2.txt)
+
 let tree_of_path namespace = function
   | Pident id when Ident.is_instance id ->
     (* Only when the instance name is the entire path (which is the only place
@@ -859,6 +864,7 @@ let best_type_path_original p =
 type type_result = Shorter_paths.type_result =
   | Nth of int
   | Path of int list option * Path.t
+  | Lid of int list option * Longident.t
 
 type type_resolution = Shorter_paths.type_resolution =
   | Nth of int
@@ -1574,6 +1580,9 @@ let rec tree_of_modal_typexp mode modal ty =
             Internal_names.add p';
             let tyl' = apply_subst_opt nso tyl in
             Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+        | Lid (nso, l') ->
+            let tyl' = apply_subst_opt nso tyl in
+            Otyp_constr (tree_of_lid l', tree_of_typlist mode tyl')
       end
     | Tvariant row ->
         let { fields; name; closed; present; all_present; tags } =
@@ -1586,6 +1595,10 @@ let rec tree_of_modal_typexp mode modal ty =
               | Nth n -> tree_of_typexp mode Alloc.Const.legacy (apply_nth n tyl)
               | Path (s, p) ->
                   let id = tree_of_path (Some Type) p in
+                  let args = tree_of_typlist mode (apply_subst_opt s tyl) in
+                  Otyp_constr (id, args)
+              | Lid (s, l) ->
+                  let id = tree_of_lid l in
                   let args = tree_of_typlist mode (apply_subst_opt s tyl) in
                   Otyp_constr (id, args)
             in
@@ -1627,6 +1640,14 @@ let rec tree_of_modal_typexp mode modal ty =
                 (fun () -> tree_of_typlist mode tyl)
             in
             Otyp_constr (tree_of_path (Some Type) p', tyl)
+        | Lid (s, l') ->
+            let tyl = apply_subst_opt s [ty] in
+            let tyl =
+              wrap_printing_env_unguarded
+                (Env.enter_quotation !printing_env)
+                (fun () -> tree_of_typlist mode tyl)
+            in
+            Otyp_constr (tree_of_lid l', tyl)
         end
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
@@ -2938,6 +2959,11 @@ let same_path t t' =
       match best_type_path p, best_type_path p' with
       | Nth n, Nth n' when n = n' -> true
       | Path(nso, p), Path(nso', p') when Path.same p p' ->
+          let tl = apply_subst_opt nso tl in
+          let tl' = apply_subst_opt nso' tl' in
+          List.length tl = List.length tl' &&
+          List.for_all2 eq_type tl tl'
+      | Lid(nso, l), Lid(nso', l') when Longident.same l l' ->
           let tl = apply_subst_opt nso tl in
           let tl' = apply_subst_opt nso' tl' in
           List.length tl = List.length tl' &&

@@ -56,9 +56,7 @@ Example from the manual
   $ $MERLIN single type-enclosing -position 6:10 -short-paths \
   > -filename tsubst.ml < tsubst.ml | tr '\n' ' ' | jq '.value[0].type'
   "t -> outer"
-
-
-
+FIXME with the move to Longidents for printing we loose the "t/2" information
   $ $MERLIN single type-enclosing -position 8:1 -short-paths \
   > -filename tsubst.ml < tsubst.ml | tr '\n' ' ' | jq '.value[0].type'
-  "sig type t module Sub : sig type t val to_outer : t/1 -> t/2 end end"
+  "sig type t module Sub : sig type t val to_outer : t -> t end end"

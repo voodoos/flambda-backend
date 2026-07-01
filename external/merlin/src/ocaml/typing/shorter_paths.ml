@@ -477,22 +477,26 @@ let shorten ~env ~initial ~canon_path kind =
   | None ->
     log ~title:"shorten" "Falling-back on initial path %a" Logger.fmt
       (Fun.flip path_print initial);
-    initial
+    (Untypeast.lident_of_path initial, initial)
   | Some (lid, path) ->
     log ~title:"shorten" "%a" Logger.fmt (fun fmt ->
         Format.fprintf fmt "Masking path %a with lid %a" path_print path
           Pprintast.longident lid);
-    path_mask path lid
+    (lid, path_mask path lid)
 
-type type_result = Nth of int | Path of int list option * Path.t
+type type_result =
+  | Nth of int
+  | Path of int list option * Path.t
+  | Lid of int list option * Longident.t
 
 type type_resolution = Nth of int | Subst of int list | Id
 
 let find_type env initial : type_result =
   match normalize_type_path env initial with
   | _, Nth i -> (* TODO, this looks like this is incorrect *) Nth i
-  | canon_path, Id -> Path (None, shorten ~env ~initial ~canon_path Type)
-  | canon_path, Map l -> Path (Some l, shorten ~env ~initial ~canon_path Type)
+  | canon_path, Id -> Lid (None, fst @@ shorten ~env ~initial ~canon_path Type)
+  | canon_path, Map l ->
+    Lid (Some l, fst @@ shorten ~env ~initial ~canon_path Type)
 
 let find_type_resolution env path : type_resolution =
   match normalize_type_path env path with
@@ -502,13 +506,13 @@ let find_type_resolution env path : type_resolution =
 
 let find_type_simple env initial =
   let canon_path, _subst = normalize_type_path env initial in
-  let short = shorten ~env ~initial ~canon_path Type in
+  let short = snd @@ shorten ~env ~initial ~canon_path Type in
   short
 
 let find_module env initial =
   let canon_path = Env.normalize_module_path None env initial in
-  shorten ~env ~initial ~canon_path Module
+  snd @@ shorten ~env ~initial ~canon_path Module
 
 let find_module_type env initial =
   let canon_path = Env.normalize_modtype_path env initial in
-  shorten ~env ~initial ~canon_path Module_type
+  snd @@ shorten ~env ~initial ~canon_path Module_type
