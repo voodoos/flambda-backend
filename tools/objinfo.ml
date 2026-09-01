@@ -173,38 +173,38 @@ let print_discourse_cmi (cmi : Cmi_format.cmi_infos_lazy) =
     | Sig_value (id, vd, _) ->
       let prefix = lid id in
       Format.fprintf ppf "@[<2>%a:@ %a@]"
-         Pprintast.longident prefix Discourse_types.pp vd.val_discourse
+         Pprintast.longident prefix Discourse_types.pp_array vd.val_discourse
     | Sig_type (id, td, _, _) ->
       let prefix = lid id in
       Format.fprintf ppf "@[<2>%a:@ %a@]"
-        Pprintast.longident prefix Discourse_types.pp td.type_discourse
+        Pprintast.longident prefix Discourse_types.pp_array td.type_discourse
     | Sig_typext _ -> ()
     | Sig_module (id, _, md, _, _) ->
       let prefix = lid id in
       Format.fprintf ppf "@[<2>%a:@ %a%a@]@ %a"
         Pprintast.longident prefix
         (Format.pp_print_option pp_alias) md.md_discourse_alias
-        Discourse_types.pp md.md_discourse
+        Discourse_types.pp_array md.md_discourse
         (print_modtype prefix) md.md_type
     | Sig_modtype (id, mtd, _) ->
       let prefix = lid id in
       begin match mtd with
       | { mtd_type = Some mt; _ } ->
         Format.fprintf ppf "@[<2>%a:@ %a@]@ %a"
-          Pprintast.longident prefix Discourse_types.pp mtd.mtd_discourse
+          Pprintast.longident prefix Discourse_types.pp_array mtd.mtd_discourse
           (print_modtype prefix) mt
       | _ ->
         Format.fprintf ppf "@[<2>%a:@ %a@]"
-          Pprintast.longident prefix Discourse_types.pp mtd.mtd_discourse
+          Pprintast.longident prefix Discourse_types.pp_array mtd.mtd_discourse
       end
     | Sig_class (id, cd, _, _) ->
       let prefix = lid id in
       Format.fprintf ppf "@[<2>%a:@ %a@]"
-        Pprintast.longident prefix Discourse_types.pp cd.cty_discourse
+        Pprintast.longident prefix Discourse_types.pp_array cd.cty_discourse
     | Sig_class_type (id, ctd, _, _) ->
       let prefix = lid id in
       Format.fprintf ppf "@[<2>%a:@ %a@]"
-        Pprintast.longident prefix Discourse_types.pp ctd.clty_discourse
+        Pprintast.longident prefix Discourse_types.pp_array ctd.clty_discourse
     | Sig_jkind _ -> ()
   and print_modtype prefix ppf (mty : Types.module_type) =
     match mty with

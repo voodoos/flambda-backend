@@ -1344,7 +1344,7 @@ let type_continuation_pat env expected_ty sp =
           val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
           val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
-          val_discourse = Discourse_types.empty }
+          val_discourse = [||] }
       in
         Some (id, desc)
   | Ppat_extension ext ->
@@ -1632,7 +1632,7 @@ let add_pattern_variables ?check ?check_as env pv =
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid;
-          val_discourse = Discourse_types.empty;
+          val_discourse = [||];
          } env
     )
     pv env
@@ -1665,6 +1665,7 @@ let add_module_variables env module_variables =
         | Mty_alias _ -> Mp_absent
         | _ -> Mp_present
       in
+      let md_discourse = Discourse_types.to_array md_discourse in
       let md =
         { md_type = modl.mod_type; md_attributes = [];
           md_modalities = Mode.Modality.undefined;
@@ -4066,7 +4067,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
-            ; val_discourse = Discourse_types.empty;
+            ; val_discourse = [||];
             }
             val_env
          in
@@ -4080,7 +4081,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
-            ; val_discourse = Discourse_types.empty;
+            ; val_discourse = [||];
             }
             met_env
          in
@@ -8066,6 +8067,7 @@ and type_expect_
               let scope = create_scope () in
               let md_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
               let md_shape = Shape.set_uid_if_none md_shape md_uid in
+              let md_discourse = Discourse_types.to_array md_discourse in
               let md =
                 { md_type = modl.mod_type; md_attributes = [];
                   md_modalities = Modality.undefined;
@@ -10039,7 +10041,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             val_modalities = Modality.undefined;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
-            val_discourse = Discourse_types.empty;
+            val_discourse = [||];
           }
         in
         let exp_env = Env.add_value ~mode id desc env in

@@ -1003,7 +1003,7 @@ module Merge = struct
               type_unboxed_default = false;
               type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
               type_unboxed_version = None;
-              type_discourse = Discourse_types.empty;
+              type_discourse = [||];
             }
           and id_row = Ident.create_local (s^"#row") in
           let initial_env =
@@ -1184,7 +1184,7 @@ module Merge = struct
                 mtd_type = Some mty;
                 mtd_attributes = [];
                 mtd_loc = loc;
-                mtd_discourse = Discourse_types.empty }
+                mtd_discourse = [||] }
               in Some(Sig_modtype(id, mtd', priv))
           in
           let path = Pident id in
@@ -1534,7 +1534,7 @@ and approx_module_declaration env pmd =
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
-    md_discourse = Discourse_types.empty;
+    md_discourse = [||];
     md_discourse_alias = None;
   }
 
@@ -1677,7 +1677,7 @@ and approx_modtype_info env sinfo =
    mtd_attributes = sinfo.pmtd_attributes;
    mtd_loc = sinfo.pmtd_loc;
    mtd_uid = Uid.internal_not_actually_unique;
-   mtd_discourse = Discourse_types.empty;
+   mtd_discourse = [||];
  }
 
 and approx_constraint env body constr =
@@ -2090,6 +2090,7 @@ and transl_modtype_aux env smty =
               let scope = Ctype.create_scope () in
               let id, newenv =
                 let arg_md =
+                  let md_discourse = Discourse_types.to_array md_discourse in
                   { md_type = arg.mty_type;
                     md_modalities = Mode.Modality.undefined;
                     md_attributes = [];
@@ -2381,6 +2382,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
               Mp_absent
           | _ -> Mp_present
         in
+        let md_discourse = Discourse_types.to_array md_discourse in
         let md = {
           md_type=tmty.mty_type;
           md_modalities = Modality.of_const md_modalities.moda_modalities;
@@ -2428,7 +2430,9 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           if not aliasable then
             md
           else
-            let md_discourse = Discourse_types.singleton (Module, path) in
+            let md_discourse =
+              Discourse_types.(to_array (singleton (Module, path)))
+            in
             { md_type = Mty_alias path;
               md_modalities = Mode.Modality.(Const.id |> of_const);
               md_attributes = pms.pms_attributes;
@@ -2486,7 +2490,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
                      md_attributes = md.md_attributes;
                      md_loc = md.md_loc;
                      md_uid = uid;
-                     md_discourse = Discourse_types.empty (*TODO*);
+                     md_discourse = [||] (*TODO*);
                      md_discourse_alias = None;
                     } in
             Sig_module(id, Mp_present, d, rs, Exported))
@@ -2628,7 +2632,10 @@ and transl_modtype_decl_aux env
   let tmty =
     Option.map (transl_modtype (Env.in_signature true env)) pmtd_type
   in
-  let mtd_discourse = Option.fold ~none:Discourse_types.empty ~some:(snd) tmty in
+  let mtd_discourse =
+    Option.fold ~none:Discourse_types.empty ~some:(snd) tmty
+    |> Discourse_types.to_array
+  in
   let tmty = Option.map fst tmty in
   let decl =
     {
@@ -2723,7 +2730,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
              md_loc = pmd.pmd_loc;
              md_attributes = pmd.pmd_attributes;
              md_uid;
-             md_discourse = Discourse_types.empty;
+             md_discourse = [||];
              md_discourse_alias = None }
          in
          let id_shape =
@@ -3257,7 +3264,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
                   md_attributes = [];
                   md_loc = param.loc;
                   md_uid;
-                  md_discourse = mtd_discourse;
+                  md_discourse = Discourse_types.to_array mtd_discourse;
                   md_discourse_alias = None;
                 }
               in
@@ -3935,6 +3942,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         in
         let md_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
         let mode = mode_without_locks_exn modl.mod_mode in
+        let md_discourse = Discourse_types.to_array md_discourse in
         let md =
           { md_type = enrich_module_type anchor name.txt modl.mod_type env;
             md_modalities = Modality.undefined;
@@ -4043,7 +4051,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
                        md_attributes = attrs;
                        md_loc = loc;
                        md_uid = uid;
-                       md_discourse = discourse;
+                       md_discourse = Discourse_types.to_array discourse;
                        md_discourse_alias = discourse_alias;
                      }
                    in
@@ -4077,7 +4085,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
                 md_attributes=mb.mb_attributes;
                 md_loc=mb.mb_loc;
                 md_uid = uid;
-                md_discourse = Discourse_types.empty;
+                md_discourse = [||];
                 md_discourse_alias = None;
               }, rs, Exported))
            mbs [],
@@ -4812,7 +4820,7 @@ let package_signatures units =
           md_attributes=[];
           md_loc=Location.none;
           md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
-          md_discourse = Discourse_types.empty;
+          md_discourse = [||];
           md_discourse_alias = None;
         }
       in

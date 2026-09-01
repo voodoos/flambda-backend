@@ -461,7 +461,7 @@ type type_declaration =
     type_unboxed_default: bool;
     type_uid: Uid.t;
     type_unboxed_version : type_declaration option;
-    type_discourse: Discourse_types.t;
+    type_discourse: Discourse_types.Item.t array;
  }
 
 and type_decl_kind =
@@ -566,7 +566,7 @@ and constructor_declaration =
     cd_loc: Location.t;
     cd_attributes: Parsetree.attributes;
     cd_uid: Uid.t;
-    cd_discourse: Discourse_types.t;
+    cd_discourse: Discourse_types.Item.t array;
   }
 
 and constructor_argument =
@@ -619,7 +619,7 @@ type class_declaration =
     cty_loc: Location.t;
     cty_attributes: Parsetree.attributes;
     cty_uid: Uid.t;
-    cty_discourse: Discourse_types.t;
+    cty_discourse: Discourse_types.Item.t array;
  }
 
 type class_type_declaration =
@@ -631,7 +631,7 @@ type class_type_declaration =
     clty_loc: Location.t;
     clty_attributes: Parsetree.attributes;
     clty_uid: Uid.t;
-    clty_discourse: Discourse_types.t;
+    clty_discourse: Discourse_types.Item.t array;
   }
 
 (* Type expressions for the module language *)
@@ -702,7 +702,7 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
-      val_discourse: Discourse_types.t;
+      val_discourse: Discourse_types.Item.t array;
     }
 
   type module_type =
@@ -739,7 +739,7 @@ module type Wrapped = sig
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
-    md_discourse: Discourse_types.t;
+    md_discourse: Discourse_types.Item.t array;
     md_discourse_alias: (Longident.t loc * Discourse_types.Item.t) option;
   }
 
@@ -749,7 +749,7 @@ module type Wrapped = sig
     mtd_attributes: Parsetree.attributes;
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
-    mtd_discourse: Discourse_types.t;
+    mtd_discourse: Discourse_types.Item.t array;
   }
 
   val sort_of_signature_item :

@@ -37,10 +37,14 @@ end
 
 module Paths = Set.Make (Item)
 
-let pp_paths ppf t =
+let pp_items ppf items =
   let pp_sep ppf () = Format.fprintf ppf ";@;" in
-  let paths = Paths.elements t |> List.map (fun (_, p) -> p) in
+  let paths = List.map (fun (_, p) -> p) items in
   Format.pp_print_list ~pp_sep (Format_doc.compat Path.print) ppf paths
+
+let pp_paths ppf t = pp_items ppf (Paths.elements t)
+
+let pp_array ppf items = pp_items ppf (Array.to_list items)
 
 module String_map = Map.Make (String)
 
@@ -163,6 +167,10 @@ let singleton = Paths.singleton
 let add = Paths.add
 let union = Paths.union
 let pp = pp_paths
+
+(* The paths stored in the types records are represented as arrays: they are
+   not meant to be modified and this is more compact. *)
+let to_array t = Paths.elements t |> Array.of_list
 
 type discourse = { paths : Lid_trie.t; substs : Lid_set.t Lid_map.t }
 

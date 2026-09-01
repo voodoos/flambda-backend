@@ -531,7 +531,7 @@ let mk_constructor_description cstr_name =
     cstr_uid = Uid.internal_not_actually_unique;
     cstr_repr = Variant_boxed [||];
     cstr_constant = true;
-    cstr_discourse = Discourse_types.empty
+    cstr_discourse = [||]
   }
 
 let value_binding_identifier_from_texp_match_identifier jkind = jkind
@@ -555,7 +555,7 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_uid = Uid.internal_not_actually_unique;
     val_zero_alloc = Zero_alloc.default;
     val_lpoly = Lpoly.determined [];
-    val_discourse = Discourse_types.empty
+    val_discourse = [||]
   }
 
 let mkTtyp_any = Ttyp_var (None, None)

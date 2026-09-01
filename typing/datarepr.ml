@@ -96,7 +96,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
           type_unboxed_default = false;
           type_uid = Uid.mk ~current_unit;
           type_unboxed_version = None;
-          type_discourse = Discourse_types.empty;
+          type_discourse = [||];
         }
       in
       existentials,
@@ -307,7 +307,7 @@ let extension_descr ~current_unit path_ext ext =
       cstr_attributes = ext.ext_attributes;
       cstr_inlined;
       cstr_uid = ext.ext_uid;
-      cstr_discourse = Discourse_types.empty;
+      cstr_discourse = [||];
     }
 
 let none =
@@ -329,7 +329,7 @@ let dummy_label (type rep) (record_form : rep record_form)
     lbl_loc = Location.none;
     lbl_attributes = [];
     lbl_uid = Uid.internal_not_actually_unique;
-    lbl_discourse = Discourse_types.empty;
+    lbl_discourse = [||];
   }
 
 let label_descrs record_form ty_res lbls repres decl =

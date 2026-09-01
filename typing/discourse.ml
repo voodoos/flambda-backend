@@ -45,12 +45,17 @@ We call D the domain of discourse:
       substituting the m for n in p is also in D.
 *)
 
+let add_path_to_trie (kind, path) acc =
+  Discourse_types.Lid_trie.add (Untypeast.lident_of_path path) (kind, path) acc
+
 let trie_of_paths paths =
   let open Discourse_types in
-  Paths.fold
-    (fun (kind, path) acc ->
-      Lid_trie.add (Untypeast.lident_of_path path) (kind, path) acc)
-    paths Lid_trie.empty
+  Paths.fold add_path_to_trie paths Lid_trie.empty
+
+let trie_of_path_array items =
+  Array.fold_left
+    (fun acc item -> add_path_to_trie item acc)
+    Discourse_types.Lid_trie.empty items
 
 let pp_d fmt d =
   let open Discourse_types in
@@ -422,7 +427,7 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
         | _ -> t
       in
       (* If a constructor is in U then any paths used in its type are in D. *)
-      let cstr_discourse = trie_of_paths constr.cstr_discourse in
+      let cstr_discourse = trie_of_path_array constr.cstr_discourse in
       { t with discourse = Lid_trie.union t.discourse cstr_discourse }
     end
     else t
@@ -443,7 +448,7 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
         | _ -> t
       in
       (* If a label is in U then any paths used in its type are in D. *)
-      let lbl_discourse = trie_of_paths label.lbl_discourse in
+      let lbl_discourse = trie_of_path_array label.lbl_discourse in
       { t with discourse = Lid_trie.union t.discourse lbl_discourse }
     end
     else t
@@ -565,7 +570,7 @@ module D = struct
          the paths used in that description are in D *)
       (* TODO : If a path is in D and it includes another module path within it,
          then that module path is also in D. *)
-      let md_discourse = trie_of_paths md.md_discourse in
+      let md_discourse = trie_of_path_array md.md_discourse in
       let paths = Lid_trie.union paths md_discourse in
       begin
         match md.md_type with
@@ -616,7 +621,7 @@ module D = struct
          are in *)
       (* TODO : If a path is in D and it includes another module path within it,
          then that module path is also in D. *)
-      let mtd_discourse = trie_of_paths mtd.mtd_discourse in
+      let mtd_discourse = trie_of_path_array mtd.mtd_discourse in
       ({ d with paths = Lid_trie.union d.paths mtd_discourse }, u_next)
     | Module, Some env -> module_consequences d u_next env longident path
     | Value, Some env ->
@@ -626,7 +631,7 @@ module D = struct
       (* TODO : If a path is in D and it includes another module path within it,
          then that module path is also in D. *)
       let vd = Env.find_value path env in
-      let val_discourse = trie_of_paths vd.val_discourse in
+      let val_discourse = trie_of_path_array vd.val_discourse in
       ({ d with paths = Lid_trie.union d.paths val_discourse }, u_next)
     | Type, Some env ->
       (* D6. If a type path is in U then any paths used in its equation or
@@ -636,7 +641,7 @@ module D = struct
       let td = Env.find_type path env in
       (* What does it mean when such a path is just an ident that is local to
          another module ?*)
-      let type_discourse = trie_of_paths td.type_discourse in
+      let type_discourse = trie_of_path_array td.type_discourse in
       ({ d with paths = Lid_trie.union d.paths type_discourse }, u_next)
     | _ -> (d, u_next)
 
