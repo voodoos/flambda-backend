@@ -43,6 +43,22 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
 
   $ $OCAMLC -c deferred.ml -open Async_kernel__ -o Async_kernel__Deferred
 
+  $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse Async_kernel__Deferred.cmi
+  Discourse:
+  t: Async_kernel__!.Deferred0.t
+  Let_syntax: 
+  Let_syntax.Let_syntax: 
+  Let_syntax.Let_syntax.return: 
+
+  $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse Async_kernel__.cmi
+  Discourse:
+  Deferred: alias: Async_kernel__Deferred [Async_kernel__Deferred!]
+    Async_kernel__Deferred!
+  
+  Deferred0: alias: Async_kernel__Deferred0 [Async_kernel__Deferred0!]
+    Async_kernel__Deferred0!
+  
+
 
   $ cat >async_kernel.ml <<'EOF'
   > module Deferred = Deferred
@@ -51,6 +67,14 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
 
   $ $OCAMLC -c async_kernel.ml -open Async_kernel__
 
+  $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse async_kernel.cmi
+  Discourse:
+  Deferred: alias: Deferred [Async_kernel__!.Deferred] Async_kernel__!.Deferred
+  
+  Let_syntax:
+    alias: Deferred.Let_syntax.Let_syntax [Deferred/281[1].Let_syntax.Let_syntax]
+    
+  
 
   $ cd ..
   $ mkdir async
