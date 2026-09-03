@@ -558,11 +558,16 @@ module D = struct
   let special_rule_for_aliases env { paths; substs } u_next path alias_lid
       alias_path =
     try
+      let alias_path, _ =
+        Env.find_module_by_name_lazy (Untypeast.lident_of_path alias_path) env
+      in
       let substs =
-        log ~title:"D12" "D12: subst %a -> %a (alias at %a)" Logger.fmt
+        log ~title:"D12S" "D12S: subst %a -> %a[%a] (alias at %a)" Logger.fmt
           (Fun.flip (Format_doc.compat Path.print) path)
           Logger.fmt
           (Fun.flip Pprintast.longident alias_lid.Location.txt)
+          Logger.fmt
+          (Fun.flip (Format_doc.compat Path.print) alias_path)
           Logger.fmt
           (Fun.flip Location.print_loc alias_lid.loc);
         U.add_subst substs path alias_lid.Location.txt

@@ -85,7 +85,9 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
     [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax]] }
+    Async.Let_syntax -> [Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax]] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
@@ -100,20 +102,50 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
-    [Deferred -> [{item = (module, Deferred[1]); env = with env}];
+    [Deferred -> [{item = (module, Async!.Deferred); env = with env}];
     Async_kernel.Let_syntax ->
       [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
         env = with env}];
     Deferred.Let_syntax ->
-      [{item = (module, Deferred[1].Let_syntax); env = with env}];
+      [{item = (module, Async!.Deferred.Let_syntax); env = with env}];
     Deferred.Let_syntax.Let_syntax ->
-      [{item = (module, Deferred[1].Let_syntax.Let_syntax); env = with env}]];
+      [{item = (module, Async!.Deferred.Let_syntax.Let_syntax); env = with env}]];
+    substs =
+    [] }
+  # discourse-recap - next_U
+  next_U (non-empty, looping):
+  { u_paths =
+    [Async_kernel -> [{item = (module, Async_kernel!); env = with env}];
+    Deferred -> [{item = (module, Async_kernel__Deferred!); env = with env}];
+    Async_kernel.Deferred ->
+      [{item = (module, Async_kernel!.Deferred); env = with env}];
+    Deferred.Let_syntax ->
+      [{item = (module, Async_kernel__Deferred!.Let_syntax); env = with env}];
+    Deferred.Let_syntax.Let_syntax ->
+      [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
+        env = with env}]];
+    substs =
+    [] }
+  # discourse-recap - next_U
+  next_U (non-empty, looping):
+  { u_paths =
+    [Deferred -> [{item = (module, Async_kernel__!.Deferred); env = with env}];
+    Async_kernel.Deferred ->
+      [{item = (module, Async_kernel__Deferred!); env = with env}]];
+    substs =
+    [] }
+  # discourse-recap - next_U
+  next_U (non-empty, looping):
+  { u_paths =
+    [Async_kernel__Deferred ->
+       [{item = (module, Async_kernel__Deferred!); env = with env}];
+    Deferred -> [{item = (module, Async_kernel__Deferred!); env = with env}]];
     substs =
     [] }
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 132;
+    size = 154;
     paths =
     unit [unit!];
     t [t[1]];
@@ -172,26 +204,45 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     Let_syntax.return
       [Async!.Let_syntax.return;
        Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Deferred [Deferred[1]; Async!.Deferred];
-    Deferred.Let_syntax [Deferred[1].Let_syntax];
-    Deferred.Let_syntax.Let_syntax [Deferred[1].Let_syntax.Let_syntax];
+    Deferred
+      [Async_kernel__Deferred!; Async!.Deferred; Async_kernel__!.Deferred];
+    Deferred.t [Async_kernel__Deferred!.t];
+    Deferred.Let_syntax
+      [Async_kernel__Deferred!.Let_syntax; Async!.Deferred.Let_syntax];
+    Deferred.Let_syntax.Let_syntax
+      [Async_kernel__Deferred!.Let_syntax.Let_syntax;
+       Deferred[1].Let_syntax.Let_syntax;
+       Async!.Deferred.Let_syntax.Let_syntax];
+    Deferred.Let_syntax.Let_syntax.return
+      [Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
+    Async_kernel__Deferred [Async_kernel__Deferred!];
+    Async_kernel__Deferred.t [Async_kernel__Deferred!.t];
+    Async_kernel__Deferred.Let_syntax [Async_kernel__Deferred!.Let_syntax];
+    Async_kernel__.Deferred [Async_kernel__!.Deferred];
     Async_kernel [Async_kernel!];
     Async_kernel.Let_syntax
       [Async_kernel!.Let_syntax; Async_kernel__Deferred!.Let_syntax.Let_syntax];
     Async_kernel.Let_syntax.return
       [Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Async_kernel.Deferred [Async_kernel!.Deferred];
+    Async_kernel.Deferred [Async_kernel__Deferred!; Async_kernel!.Deferred];
+    Async_kernel.Deferred.t [Async_kernel__Deferred!.t];
+    Async_kernel.Deferred.Let_syntax [Async_kernel__Deferred!.Let_syntax];
     Async [Async!];
     Async.Let_syntax [Async!.Let_syntax];
     Async.Deferred [Async!.Deferred];
     substs =
-    [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
-    Async.Deferred -> [Deferred];
+    [Async_kernel__Deferred ->
+       [Deferred; Async.Deferred; Async_kernel.Deferred];
+    Async.Deferred -> [Deferred; Async_kernel.Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async.Deferred];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred ->
+      [Async_kernel__Deferred; Deferred; Async.Deferred];
+    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
+      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax;
+       Deferred.Let_syntax.Let_syntax];
     Async_kernel.Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
@@ -200,13 +251,18 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
   { u_paths =
     [];
     substs =
-    [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
-    Async.Deferred -> [Deferred];
+    [Async_kernel__Deferred ->
+       [Deferred; Async.Deferred; Async_kernel.Deferred];
+    Async.Deferred -> [Deferred; Async_kernel.Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async.Deferred];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred ->
+      [Async_kernel__Deferred; Deferred; Async.Deferred];
+    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
+      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax;
+       Deferred.Let_syntax.Let_syntax];
     Async_kernel.Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]] }
   # discourse-recap - D
@@ -216,13 +272,18 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     paths =
     ;
     substs =
-    [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
-    Async.Deferred -> [Deferred];
+    [Async_kernel__Deferred ->
+       [Deferred; Async.Deferred; Async_kernel.Deferred];
+    Async.Deferred -> [Deferred; Async_kernel.Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async.Deferred];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred ->
+      [Async_kernel__Deferred; Deferred; Async.Deferred];
+    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
+      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax;
+       Deferred.Let_syntax.Let_syntax];
     Async_kernel.Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
@@ -259,7 +320,9 @@ Dump the discourse so regressions show up as a diff in this test:
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
     [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax]] }
+    Async.Let_syntax -> [Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax]] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
@@ -274,20 +337,50 @@ Dump the discourse so regressions show up as a diff in this test:
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
-    [Deferred -> [{item = (module, Deferred[1]); env = with env}];
+    [Deferred -> [{item = (module, Async!.Deferred); env = with env}];
     Async_kernel.Let_syntax ->
       [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
         env = with env}];
     Deferred.Let_syntax ->
-      [{item = (module, Deferred[1].Let_syntax); env = with env}];
+      [{item = (module, Async!.Deferred.Let_syntax); env = with env}];
     Deferred.Let_syntax.Let_syntax ->
-      [{item = (module, Deferred[1].Let_syntax.Let_syntax); env = with env}]];
+      [{item = (module, Async!.Deferred.Let_syntax.Let_syntax); env = with env}]];
+    substs =
+    [] }
+  # discourse-recap - next_U
+  next_U (non-empty, looping):
+  { u_paths =
+    [Async_kernel -> [{item = (module, Async_kernel!); env = with env}];
+    Deferred -> [{item = (module, Async_kernel__Deferred!); env = with env}];
+    Async_kernel.Deferred ->
+      [{item = (module, Async_kernel!.Deferred); env = with env}];
+    Deferred.Let_syntax ->
+      [{item = (module, Async_kernel__Deferred!.Let_syntax); env = with env}];
+    Deferred.Let_syntax.Let_syntax ->
+      [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
+        env = with env}]];
+    substs =
+    [] }
+  # discourse-recap - next_U
+  next_U (non-empty, looping):
+  { u_paths =
+    [Deferred -> [{item = (module, Async_kernel__!.Deferred); env = with env}];
+    Async_kernel.Deferred ->
+      [{item = (module, Async_kernel__Deferred!); env = with env}]];
+    substs =
+    [] }
+  # discourse-recap - next_U
+  next_U (non-empty, looping):
+  { u_paths =
+    [Async_kernel__Deferred ->
+       [{item = (module, Async_kernel__Deferred!); env = with env}];
+    Deferred -> [{item = (module, Async_kernel__Deferred!); env = with env}]];
     substs =
     [] }
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 132;
+    size = 154;
     paths =
     unit [unit!];
     t [t[1]];
@@ -346,26 +439,45 @@ Dump the discourse so regressions show up as a diff in this test:
     Let_syntax.return
       [Async!.Let_syntax.return;
        Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Deferred [Deferred[1]; Async!.Deferred];
-    Deferred.Let_syntax [Deferred[1].Let_syntax];
-    Deferred.Let_syntax.Let_syntax [Deferred[1].Let_syntax.Let_syntax];
+    Deferred
+      [Async_kernel__Deferred!; Async!.Deferred; Async_kernel__!.Deferred];
+    Deferred.t [Async_kernel__Deferred!.t];
+    Deferred.Let_syntax
+      [Async_kernel__Deferred!.Let_syntax; Async!.Deferred.Let_syntax];
+    Deferred.Let_syntax.Let_syntax
+      [Async_kernel__Deferred!.Let_syntax.Let_syntax;
+       Deferred[1].Let_syntax.Let_syntax;
+       Async!.Deferred.Let_syntax.Let_syntax];
+    Deferred.Let_syntax.Let_syntax.return
+      [Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
+    Async_kernel__Deferred [Async_kernel__Deferred!];
+    Async_kernel__Deferred.t [Async_kernel__Deferred!.t];
+    Async_kernel__Deferred.Let_syntax [Async_kernel__Deferred!.Let_syntax];
+    Async_kernel__.Deferred [Async_kernel__!.Deferred];
     Async_kernel [Async_kernel!];
     Async_kernel.Let_syntax
       [Async_kernel!.Let_syntax; Async_kernel__Deferred!.Let_syntax.Let_syntax];
     Async_kernel.Let_syntax.return
       [Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Async_kernel.Deferred [Async_kernel!.Deferred];
+    Async_kernel.Deferred [Async_kernel__Deferred!; Async_kernel!.Deferred];
+    Async_kernel.Deferred.t [Async_kernel__Deferred!.t];
+    Async_kernel.Deferred.Let_syntax [Async_kernel__Deferred!.Let_syntax];
     Async [Async!];
     Async.Let_syntax [Async!.Let_syntax];
     Async.Deferred [Async!.Deferred];
     substs =
-    [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
-    Async.Deferred -> [Deferred];
+    [Async_kernel__Deferred ->
+       [Deferred; Async.Deferred; Async_kernel.Deferred];
+    Async.Deferred -> [Deferred; Async_kernel.Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async.Deferred];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred ->
+      [Async_kernel__Deferred; Deferred; Async.Deferred];
+    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
+      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax;
+       Deferred.Let_syntax.Let_syntax];
     Async_kernel.Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
@@ -374,13 +486,18 @@ Dump the discourse so regressions show up as a diff in this test:
   { u_paths =
     [];
     substs =
-    [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
-    Async.Deferred -> [Deferred];
+    [Async_kernel__Deferred ->
+       [Deferred; Async.Deferred; Async_kernel.Deferred];
+    Async.Deferred -> [Deferred; Async_kernel.Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async.Deferred];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred ->
+      [Async_kernel__Deferred; Deferred; Async.Deferred];
+    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
+      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax;
+       Deferred.Let_syntax.Let_syntax];
     Async_kernel.Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]] }
   # discourse-recap - D
@@ -390,13 +507,18 @@ Dump the discourse so regressions show up as a diff in this test:
     paths =
     ;
     substs =
-    [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
-    Async.Deferred -> [Deferred];
+    [Async_kernel__Deferred ->
+       [Deferred; Async.Deferred; Async_kernel.Deferred];
+    Async.Deferred -> [Deferred; Async_kernel.Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async.Deferred];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred ->
+      [Async_kernel__Deferred; Deferred; Async.Deferred];
+    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
+      [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax;
+       Deferred.Let_syntax.Let_syntax];
     Async_kernel.Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
