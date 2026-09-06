@@ -155,10 +155,9 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 139;
+    size = 138;
     paths =
     unit [unit!];
-    t [t[1]];
     string [string!];
     or_null [or_null!];
     option [option!];
@@ -222,7 +221,8 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
     Repro2_types.Topic_name [Repro2_types!.Topic_name];
     Repro2_main [Repro2_main!];
     Repro2_main.Topic_name [Repro2_types__Topic_name!; Repro2_main!.Topic_name];
-    Repro2_main.Topic_name.t [Repro2_types__Topic_name!.t];
+    Repro2_main.Topic_name.t
+      [Repro2_types__Topic_name!.t; Repro2_main!.Topic_name.t];
     Repro2_main.Topic_name.of_topic
       [Repro2_types__Topic_name!.of_topic; Repro2_main!.Topic_name.of_topic];
     Repro2_main.Topic [Repro2_main!.Topic];

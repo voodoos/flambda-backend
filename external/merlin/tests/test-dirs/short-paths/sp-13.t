@@ -72,8 +72,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
   Deferred: alias: Deferred [Async_kernel__!.Deferred] Async_kernel__!.Deferred
   
   Let_syntax:
-    alias: Deferred.Let_syntax.Let_syntax [Deferred/281[1].Let_syntax.Let_syntax]
-    
+    alias: Deferred.Let_syntax.Let_syntax [Deferred/286.Let_syntax.Let_syntax] 
   
 
   $ cd ..
@@ -90,8 +89,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
   Deferred: alias: Deferred [Async_kernel__!.Deferred] Async_kernel__!.Deferred
   
   Let_syntax:
-    alias: Deferred.Let_syntax.Let_syntax [Deferred/281[1].Let_syntax.Let_syntax]
-    
+    alias: Deferred.Let_syntax.Let_syntax [Deferred/283.Let_syntax.Let_syntax] 
   
   $ cd ..
 

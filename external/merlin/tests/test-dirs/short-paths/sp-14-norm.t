@@ -66,7 +66,7 @@ some point.
   Discourse:
   Deferred: 
   Deferred.t: 
-  Deferred.create: t/280[1]
+  Deferred.create: t/290
 
   $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse async_kernel/async_kernel.cmi
   Discourse:
@@ -76,7 +76,7 @@ some point.
   $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse async_kernel/async_kernel__Deferred.cmi
   Discourse:
   t: 
-  create: t/280[1]
+  create: t/282
 
   $ $MERLIN single type-enclosing -position 3:5 \
   > -filename test.ml < test.ml 
