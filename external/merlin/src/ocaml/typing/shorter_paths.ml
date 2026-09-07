@@ -145,6 +145,8 @@ module String_map = Discourse_types.String_map
 let priority_queue : Priority_queue.t ref =
   Local_store.s_ref Priority_queue.empty
 let not_in_env : Lid_trie.t ref = Local_store.s_ref Lid_trie.empty
+let canon_table : Lid_path_set.t Path.Tbl.t ref =
+  Local_store.s_table Path.Tbl.create 256
 (* TODO CR Ulysse having a table keyed by Uids would seem to be a better choice,
    but it does not always work. One example of that is test `sp-13` were a type
    from Deferred0 is redefined in Deferred, causing paths converging to this same
@@ -368,9 +370,7 @@ let process_queue env state ~table ~canon_path target_kind best =
            called multiple times with the same environment. This notably happens
            when printing module signatures, and they can be quite large. *)
         let queue = Priority_queue.remove item state.queue in
-        let not_in_env =
-          Lid_trie.add lid (Type, path) state.not_in_env
-        in
+        let not_in_env = Lid_trie.add lid (Type, path) state.not_in_env in
         { queue; not_in_env }
         end
     in
