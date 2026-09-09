@@ -56,32 +56,33 @@ let { Logger.log = log_recap } = Logger.for_section recap_log_section
 let trie_of_paths paths =
   let open Discourse_types in
   Paths.fold
-    (fun (kind, path) acc ->
-      Lid_trie.add (Untypeast.lident_of_path path) (kind, path) acc)
-    paths Lid_trie.empty
+    (fun (kind, path) acc -> Path_trie.add path kind acc)
+    paths Path_trie.empty
 
 let pp_d fmt d =
   let open Discourse_types in
   let open Format in
   let pp_sep fmt () = fprintf fmt ";@ " in
-  let pp_lid_set fmt set =
+  let pp_path_set fmt set =
     fprintf fmt "@[<1>[%a]@]"
-      (pp_print_list ~pp_sep Pprintast.longident)
-      (Lid_set.elements set)
+      (pp_print_list ~pp_sep (Format_doc.compat Path.print))
+      (Path.Set.elements set)
   in
-  let pp_substs_binding fmt (lid, lids) =
-    fprintf fmt "@[<2>%a ->@ %a@]" Pprintast.longident lid pp_lid_set lids
+  let pp_substs_binding fmt (path, paths) =
+    fprintf fmt "@[<2>%a ->@ %a@]"
+      (Format_doc.compat Path.print)
+      path pp_path_set paths
   in
   let pp_substs fmt map =
-    if Lid_map.is_empty map then fprintf fmt "[]"
+    if Path.Map.is_empty map then fprintf fmt "[]"
     else
       fprintf fmt "@[<v>[%a]@]"
         (pp_print_list ~pp_sep pp_substs_binding)
-        (Lid_map.bindings map)
+        (Path.Map.bindings map)
   in
   fprintf fmt
     "@[<v 2>Discourse {@;size = %i;@;paths =@ %a;@;substs =@ %a@;<-2>}@]"
-    (Lid_trie.size d.paths) Lid_trie.pp_seq d.paths pp_substs d.substs
+    (Path_trie.size d.paths) Path_trie.pp_seq d.paths pp_substs d.substs
 
 (* A more verbose section which logs every addition to U or D, along with the
    reason the element is added (U1, U2, U3, D2, …, D12) *)
@@ -123,6 +124,8 @@ module U = struct
              So when we would need to do that, we reach out to a disambigator
              id. *)
     }
+
+  let item_path { item = _, path; _ } = path
   module ItemSet = Set.Make (struct
     type t = u_item
 
@@ -139,13 +142,15 @@ module U = struct
   end)
 
   type u =
-    { u_paths : ItemSet.t Lid_map.t;
-      substs : Lid_set.t Lid_map.t;
-      discourse : Lid_trie.t
+    { u_paths : ItemSet.t Path.Map.t;
+      substs : Discourse_types.substs;
+      discourse : Path_trie.t
     }
 
-  let paths_union (ps1 : ItemSet.t Lid_map.t) (ps2 : ItemSet.t Lid_map.t) =
-    Lid_map.union (fun _key set1 set2 -> Some (ItemSet.union set1 set2)) ps1 ps2
+  let paths_union (ps1 : ItemSet.t Path.Map.t) (ps2 : ItemSet.t Path.Map.t) =
+    Path.Map.union
+      (fun _key set1 set2 -> Some (ItemSet.union set1 set2))
+      ps1 ps2
 
   let pp_u fmt u =
     let open Format in
@@ -166,43 +171,33 @@ module U = struct
         (pp_print_list ~pp_sep pp_u_item)
         (ItemSet.elements set)
     in
-    let pp_u_paths_binding fmt (lid, items) =
-      fprintf fmt "@[<2>%a ->@ %a@]" Pprintast.longident lid pp_item_set items
+    let pp_u_paths_binding fmt (path, items) =
+      fprintf fmt "@[<2>%a ->@ %a@]"
+        (Format_doc.compat Path.print)
+        path pp_item_set items
     in
     let pp_u_paths fmt map =
       fprintf fmt "@[<v>[%a]@]"
         (pp_print_list ~pp_sep pp_u_paths_binding)
-        (Lid_map.bindings map)
-    in
-    let pp_lid_set fmt set =
-      fprintf fmt "@[<1>[%a]@]"
-        (pp_print_list ~pp_sep Pprintast.longident)
-        (Lid_set.elements set)
-    in
-    let pp_substs_binding fmt (lid, lids) =
-      fprintf fmt "@[<2>%a ->@ %a@]" Pprintast.longident lid pp_lid_set lids
-    in
-    let pp_substs fmt map =
-      fprintf fmt "@[<v>[%a]@]"
-        (pp_print_list ~pp_sep pp_substs_binding)
-        (Lid_map.bindings map)
+        (Path.Map.bindings map)
     in
     fprintf fmt "@[<v 2>{ u_paths =@ %a;@ substs =@ %a }@]" pp_u_paths u.u_paths
-      pp_substs u.substs
+      Discourse_types.pp_substs u.substs
 
-  let add_item_set lid item item_set =
-    Lid_map.update lid
+  let add_item_set item item_set =
+    let path = item_path item in
+    Path.Map.update path
       (function
         | None -> Some (ItemSet.singleton item)
         | Some set -> Some (ItemSet.add item set))
       item_set
 
-  let add_item lid item u =
-    let u_paths = add_item_set lid item u.u_paths in
+  let add_item item u =
+    let u_paths = add_item_set item u.u_paths in
     { u with u_paths }
 
   let empty_u : u =
-    Lid_map.{ u_paths = empty; substs = empty; discourse = Lid_trie.empty }
+    Path.Map.{ u_paths = empty; substs = empty; discourse = Path_trie.empty }
   let g = Local_store.s_ref empty_u
 
   (** We call U the set of all paths used directly in a file:
@@ -228,7 +223,7 @@ module U = struct
   let add_initial_discourse () =
     let d = !g in
     let predef_discourse = Predef.discourse () |> trie_of_paths in
-    let discourse = Lid_trie.union predef_discourse d.discourse in
+    let discourse = Path_trie.union predef_discourse d.discourse in
     g := { d with discourse }
 
   let fold_on_common_lid_and_path_segments ~init ~kind ~f (lid, path) =
@@ -244,105 +239,88 @@ module U = struct
     in
     aux init kind (lid, path)
 
-  (* If a path is in D and it includes another module path within it, then that
-     module path is also in D.*)
-  let add_all_components acc paths =
-    let seq = Lid_trie.to_seq paths in
-    Seq.fold_left
-      (fun acc (lid, paths) ->
-        Paths.fold
-          (fun (kind, path) init ->
-            fold_on_common_lid_and_path_segments ~init ~kind
-              ~f:(fun acc kind (lid, path) -> Lid_trie.add lid (kind, path) acc)
-              (lid, path))
-          paths acc)
-      acc seq
+  let fold_on_path_segments ~init ~kind ~f path =
+    let rec aux acc kind (path : Path.t) =
+      let acc = f acc kind path in
+      match path with
+      | Pident _ -> acc
+      | Pdot (p, _) -> aux acc Module p
+      | Papply (p1, p2) ->
+        let acc = aux acc Module p2 in
+        aux acc Module p1
+      | _ -> (* TODO Handle extra ? *) acc
+    in
+    aux init kind path
 
-  let add_subst substs path lid =
+  let add_subst substs path by_path =
     log ~title:"subst" "subst: %a -> %a (open/alias defined in file)" Logger.fmt
       (Fun.flip (Format_doc.compat Path.print) path)
       Logger.fmt
-      (Fun.flip Pprintast.longident lid);
+      (Fun.flip (Format_doc.compat Path.print) by_path);
     let substs =
-      Lid_map.update
-        (Untypeast.lident_of_path path)
+      Path.Map.update path
         (function
-          | None -> Some (Lid_set.singleton lid)
-          | Some lids -> Some (Lid_set.add lid lids))
+          | None -> Some (Path.Set.singleton by_path)
+          | Some paths -> Some (Path.Set.add by_path paths))
         substs
     in
     substs
 
-  let add_subst_g path lid =
-    g := { !g with substs = add_subst !g.substs path lid }
+  let add_subst_g path path' =
+    g := { !g with substs = add_subst !g.substs path path' }
 
   (** {1 Rule U2: All paths for definitions in the current file are in U} *)
 
-  let lid_and_path_of_ident ?root_lid ?root_path id =
-    let lid =
-      match root_lid with
-      | Some lid ->
-        Longident.Ldot (Location.mknoloc lid, Location.mknoloc (Ident.name id))
-      | None -> Longident.Lident (Ident.name id)
-    in
-    let path =
-      match root_path with
-      | Some path -> Path.Pdot (path, Ident.name id)
-      | None -> Path.Pident id
-    in
-    (lid, path)
+  let path_of_ident ?root_path id =
+    match root_path with
+    | Some path -> Path.Pdot (path, Ident.name id)
+    | None -> Path.Pident id
 
   let if_record_usage f = if record_usages then f ()
 
-  let define ~from kind ?root_path ?root_lid id =
+  let define ~from kind ?root_path id =
     if_record_usage @@ fun () ->
-    let lid, path = lid_and_path_of_ident ?root_path ?root_lid id in
-    log ~title:"U2" "U2: %s %a [%a] %s"
+    let path = path_of_ident ?root_path id in
+    log ~title:"U2" "U2: %s %a %s"
       (Shape.Sig_component_kind.to_string kind)
-      Logger.fmt
-      (fun fmt -> Pprintast.longident fmt lid)
       Logger.fmt
       (fun fmt -> (Format_doc.compat Path.print) fmt path)
       (match from with
       | `File -> "defined in current file"
       | `Open -> "brough in scope by an open");
-    let item = (kind, path) in
-    g := { !g with discourse = Lid_trie.add lid item !g.discourse }
+    g := { !g with discourse = Path_trie.add path kind !g.discourse }
 
-  let rec define_signature ?(from = `File) ?root_path ?root_lid sg =
-    if record_usages then
-      List.iter (define_component ~from ?root_path ?root_lid) sg
+  let rec define_signature ?(from = `File) ?root_path sg =
+    if record_usages then List.iter (define_component ~from ?root_path) sg
 
-  and define_component ?(from = `File) ?root_path ?root_lid sig_item =
+  and define_component ?(from = `File) ?root_path sig_item =
     if record_usages then
       match (sig_item : Types.signature_item) with
-      | Sig_type (id, _, _, _) -> define_type ~from ?root_path ?root_lid id
-      | Sig_value (id, _, _) -> define_value ~from ?root_path ?root_lid id
+      | Sig_type (id, _, _, _) -> define_type ~from ?root_path id
+      | Sig_value (id, _, _) -> define_value ~from ?root_path id
       | Sig_typext (_, _, _, _) | Sig_jkind _ -> ()
-      | Sig_module (id, _, md, _, _) ->
-        define_module ~from ?root_path ?root_lid md id
-      | Sig_modtype (id, _, _) -> define_modtype ~from ?root_path ?root_lid id
+      | Sig_module (id, _, md, _, _) -> define_module ~from ?root_path md id
+      | Sig_modtype (id, _, _) -> define_modtype ~from ?root_path id
       | Sig_class (_, _, _, _) | Sig_class_type (_, _, _, _) ->
         (* TODO: do *) ()
 
-  and define_type ?(from = `File) ?root_path ?root_lid id =
-    define ~from ?root_path ?root_lid Type id
+  and define_type ?(from = `File) ?root_path id =
+    define ~from ?root_path Type id
 
-  and define_value ?(from = `File) ?root_path ?root_lid id =
-    define ~from ?root_path ?root_lid Value id
+  and define_value ?(from = `File) ?root_path id =
+    define ~from ?root_path Value id
 
-  and define_module ?(from = `File) ?root_path ?root_lid
-      (decl : Types.module_declaration) id =
-    define ~from Module ?root_path ?root_lid id;
-    let root_lid, root_path = lid_and_path_of_ident ?root_path ?root_lid id in
+  and define_module ?(from = `File) ?root_path (decl : Types.module_declaration)
+      id =
+    define ~from Module ?root_path id;
+    let root_path = path_of_ident ?root_path id in
     match decl.md_type with
-    | Mty_ident path | Mty_alias path -> add_subst_g path root_lid
-    | Mty_signature module_type ->
-      define_signature ~from ~root_path ~root_lid module_type
+    | Mty_ident path | Mty_alias path -> add_subst_g path root_path
+    | Mty_signature module_type -> define_signature ~from ~root_path module_type
     | _ -> ()
 
-  and define_modtype ?(from = `File) ?root_path ?root_lid id =
-    define ~from ?root_path ?root_lid Module_type id
+  and define_modtype ?(from = `File) ?root_path id =
+    define ~from ?root_path Module_type id
 
   (** {1 Rule U3}
 
@@ -352,41 +330,40 @@ module U = struct
      just to make sure they do.
   *)
 
-  let rec define_signature_for_open _env ~root_path ~root_lid
-      (sg : Subst.Lazy.signature) =
+  let rec define_signature_for_open _env ~root_path (sg : Subst.Lazy.signature)
+      =
     List.iter
       (fun sig_item ->
         match (sig_item : Subst.Lazy.signature_item) with
         | Sig_type (id, _, _, _) ->
           log ~title:"U3" "U3: type %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          define_type ~from:`Open ~root_path ?root_lid id
+          define_type ~from:`Open ~root_path id
         | Sig_value (id, _, _) ->
           log ~title:"U3" "U3: value %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          define_value ~from:`Open ~root_path ?root_lid id
+          define_value ~from:`Open ~root_path id
         | Sig_typext (_, _, _, _) | Sig_jkind _ -> ()
         | Sig_module (id, Mp_present, { md_type = Mty_signature s; _ }, _, _) ->
           (* We recursively  bring everything that is direcelty defined in the
              opened module, but without following aliases. *)
           log ~title:"U3" "U3: module (present) %a brought in scope by open"
             Logger.fmt (Fun.flip Ident.print id);
-          let lid, path = lid_and_path_of_ident ~root_path ?root_lid id in
-          add_subst_g path lid;
-          define ~from:`Open Module ~root_path ?root_lid id;
-          let root_lid = Some lid in
-          define_signature_for_open _env ~root_path:path ~root_lid s
+          let path = path_of_ident ~root_path id in
+          add_subst_g path (Pident id);
+          define ~from:`Open Module ~root_path id;
+          define_signature_for_open _env ~root_path:path s
         | Sig_module (id, _, { md_type; _ }, _, _) ->
           log ~title:"U3" "U3: module %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          let lid, path = lid_and_path_of_ident ~root_path ?root_lid id in
+          let path = path_of_ident ~root_path id in
           let () =
             match md_type with
-            | Mty_alias alias_path -> add_subst_g alias_path lid
+            | Mty_alias alias_path -> add_subst_g alias_path path
             | _ -> ()
           in
-          add_subst_g path lid;
-          define ~from:`Open Module ~root_path ?root_lid id
+          add_subst_g path (Pident id);
+          define ~from:`Open Module ~root_path id
           (* TODO Adding to U here fixes a few issues but we would prefer not to
              do it. *)
           (* g := *)
@@ -399,7 +376,7 @@ module U = struct
         | Sig_modtype (id, _, _) ->
           log ~title:"U3" "U3: module type %a brought in scope by open"
             Logger.fmt (Fun.flip Ident.print id);
-          define_modtype ~from:`Open ~root_path ?root_lid id
+          define_modtype ~from:`Open ~root_path id
         | Sig_class (_, _, _, _) | Sig_class_type (_, _, _, _) ->
           (* TODO: do *) ())
       (Subst.Lazy.force_signature_once sg)
@@ -414,8 +391,7 @@ module U = struct
         let root_path = Env.normalize_module_path None env path in
         let md = Env.find_module_lazy root_path env in
         match md.md_type with
-        | Mty_signature sg ->
-          define_signature_for_open env ~root_path ~root_lid:None sg
+        | Mty_signature sg -> define_signature_for_open env ~root_path sg
         | _ -> ()
       with Not_found -> ()
     end
@@ -428,7 +404,7 @@ module U = struct
 
   let add_used env kind lid path t =
     let loc = lid.Location.loc in
-    let f acc kind (lid, path) =
+    let f acc kind path =
       log ~title:"U1" "U1: path %a used in file: %a (%a)" Logger.fmt
         (fun fmt ->
           Format.pp_print_string fmt (Shape.Sig_component_kind.to_string kind))
@@ -436,15 +412,16 @@ module U = struct
         (Fun.flip (Format_doc.compat Path.print) path)
         Logger.fmt
         (fun fmt -> Location.print_loc fmt loc);
-      add_item lid
+      add_item
         { item = (kind, path);
           env = Some env;
           disambiguator = Disambiguate_id.get_id ()
         }
         acc
     in
-    fold_on_common_lid_and_path_segments ~init:t ~kind ~f
-      (lid.Location.txt, path)
+    (* If a path is in D and it includes another module path within it, then that
+       module path is also in D.*)
+    fold_on_path_segments ~init:t ~kind ~f path
 
   let use_module env lid path = add_used env Module lid path
   let use_modtype env lid path = add_used env Module_type lid path
@@ -471,7 +448,7 @@ module U = struct
         Logger.fmt
         (Fun.flip Pprintast.longident lid.txt);
       let cstr_discourse = trie_of_paths constr.cstr_discourse in
-      { t with discourse = Lid_trie.union t.discourse cstr_discourse }
+      { t with discourse = Path_trie.union t.discourse cstr_discourse }
     end
     else t
 
@@ -493,7 +470,7 @@ module U = struct
       log ~title:"D7" "D7: label %a used, merging its discourse" Logger.fmt
         (Fun.flip Pprintast.longident lid.txt);
       let lbl_discourse = trie_of_paths label.lbl_discourse in
-      { t with discourse = Lid_trie.union t.discourse lbl_discourse }
+      { t with discourse = Path_trie.union t.discourse lbl_discourse }
     end
     else t
 end
@@ -534,24 +511,25 @@ module D = struct
   (* TODO: this is not really a chain, just increasingly large jumps. This
      reduces the number of combinations when unrolling substitutions but we might
      need the missing internal aliases. *)
-  let follow_aliases_adding_subst log_detail env substs path lid =
-    let add_to_substs substs path lid =
+  let follow_aliases_adding_subst log_detail env substs path path' =
+    let add_to_substs substs path path' =
       log ~title:"D12" "D12: subst %a -> %a (%s)" Logger.fmt
         (Fun.flip (Format_doc.compat Path.print) path)
         Logger.fmt
-        (Fun.flip Pprintast.longident lid)
+        (Fun.flip (Format_doc.compat Path.print) path')
         log_detail;
-      U.add_subst substs path lid
+      U.add_subst substs path path'
     in
     let rec loop substs path =
       match path with
-      | Path.Pident id when Ident.is_global id -> add_to_substs substs path lid
+      | Path.Pident id when Ident.is_global id ->
+        add_to_substs substs path path'
       | _ -> (
         match Env.find_module_lazy path env with
         | { md_type = Mty_alias path1 } ->
-          let substs = add_to_substs substs path1 lid in
+          let substs = add_to_substs substs path1 path' in
           loop substs path1
-        | _ -> add_to_substs substs path lid)
+        | _ -> add_to_substs substs path path')
     in
     loop substs path
 
@@ -570,7 +548,7 @@ module D = struct
           (Fun.flip (Format_doc.compat Path.print) alias_path)
           Logger.fmt
           (Fun.flip Location.print_loc alias_lid.loc);
-        U.add_subst substs path alias_lid.Location.txt
+        U.add_subst substs path alias_path
       in
       (* TODO: This is an unwritten rule (yet): If a module in U is an alias
          then this alias is also in U *)
@@ -578,8 +556,7 @@ module D = struct
       ({ paths; substs }, u_next)
     with Not_found -> ({ paths; substs }, u_next)
 
-  let d3_rule env lid path paths substs sig_ =
-    let ldot id = Longident.Ldot (lid, Location.mknoloc (Ident.name id)) in
+  let d3_rule env path paths substs sig_ =
     let pdot id = Path.Pdot (path, Ident.name id) in
     List.fold_left
       (fun (paths, substs) item ->
@@ -591,8 +568,8 @@ module D = struct
             Logger.fmt
             (Fun.flip (Format_doc.compat Path.print) (pdot id))
             Logger.fmt
-            (Fun.flip Pprintast.longident lid.txt);
-          Lid_trie.add (ldot id) (kind, pdot id) paths
+            (Fun.flip (Format_doc.compat Path.print) path);
+          Path_trie.add (pdot id) kind paths
         in
         match (item : Subst.Lazy.signature_item) with
         | Subst.Lazy.Sig_value (id, _, _) -> (add Value id, substs)
@@ -604,9 +581,8 @@ module D = struct
           let substs =
             match md.md_type with
             | Mty_alias path' ->
-              let lid = ldot id in
               follow_aliases_adding_subst "sub-component is a module alias" env
-                substs path' lid
+                substs path' (pdot id)
             | _ -> substs
           in
           (paths, substs)
@@ -621,8 +597,7 @@ module D = struct
      [u_next]): sometimes it is represented as a couple and sometimes as two
      distinct arguments, preventing the more readable folds *)
 
-  let module_consequences { paths; substs } u_next env lid path :
-      discourse * U.u =
+  let module_consequences { paths; substs } u_next env path : discourse * U.u =
     let (paths, substs), u_next =
       let md = Env.find_module_lazy path env in
       let { paths; substs }, u_next =
@@ -638,9 +613,9 @@ module D = struct
       (* TODO : If a path is in D and it includes another module path within it,
          then that module path is also in D. *)
       log ~title:"D5" "D5: merging discourse of module %a" Logger.fmt
-        (Fun.flip Pprintast.longident lid);
+        (Fun.flip (Format_doc.compat Path.print) path);
       let md_discourse = trie_of_paths md.md_discourse in
-      let paths = Lid_trie.union paths md_discourse in
+      let paths = Path_trie.union paths md_discourse in
       begin match md.md_type with
       | Mty_alias path' ->
         (* D12. If a module path m in D - note D not U - is a module alias
@@ -650,7 +625,7 @@ module D = struct
              We accumulate such substitution and will apply them when shortening
              a path. *)
         let substs =
-          follow_aliases_adding_subst "Mty_alias target" env substs path' lid
+          follow_aliases_adding_subst "Mty_alias target" env substs path' path
         in
         (* We have to follow aliases to be able to add module components to
              the discourse.
@@ -661,7 +636,7 @@ module D = struct
         (* TODO: Check, this might not be the same as the code before the
              rebase. *)
         let u_next =
-          U.add_item lid
+          U.add_item
             { item = (Module, path');
               env = Some env;
               disambiguator = U.Disambiguate_id.get_id ()
@@ -674,13 +649,13 @@ module D = struct
       | Mty_signature sig_ ->
         (* D3. If a module path is in U then all the paths of its subcomponents
              are in D *)
-        (d3_rule env (Location.mknoloc lid) path paths substs sig_, u_next)
+        (d3_rule env path paths substs sig_, u_next)
       | _ -> ((paths, substs), u_next)
       end
     in
     ({ paths; substs }, u_next)
 
-  let consequences d u_next (longident, { U.item = kind, path; env }) =
+  let consequences d u_next { U.item = kind, path; env } =
     match (kind, env) with
     | _, None -> (d, u_next)
     | Module_type, Some env ->
@@ -688,12 +663,12 @@ module D = struct
       (* D8. If a module type path is in U then any paths used in its definition
          are in *)
       log ~title:"D8" "D8: merging discourse of module type %a" Logger.fmt
-        (Fun.flip Pprintast.longident longident);
+        (Fun.flip (Format_doc.compat Path.print) path);
       (* TODO : If a path is in D and it includes another module path within it,
          then that module path is also in D. *)
       let mtd_discourse = trie_of_paths mtd.mtd_discourse in
-      ({ d with paths = Lid_trie.union d.paths mtd_discourse }, u_next)
-    | Module, Some env -> module_consequences d u_next env longident path
+      ({ d with paths = Path_trie.union d.paths mtd_discourse }, u_next)
+    | Module, Some env -> module_consequences d u_next env path
     | Value, Some env ->
       (* D4. If a value path is in U and its value description was written by a user -
          as opposed to being inferred - then the paths used in that description are
@@ -702,9 +677,9 @@ module D = struct
          then that module path is also in D. *)
       let vd = Env.find_value path env in
       log ~title:"D4" "D4: merging discourse of value %a" Logger.fmt
-        (Fun.flip Pprintast.longident longident);
+        (Fun.flip (Format_doc.compat Path.print) path);
       let val_discourse = trie_of_paths vd.val_discourse in
-      ({ d with paths = Lid_trie.union d.paths val_discourse }, u_next)
+      ({ d with paths = Path_trie.union d.paths val_discourse }, u_next)
     | Type, Some env ->
       (* D6. If a type path is in U then any paths used in its equation or
          representation are in D. *)
@@ -714,22 +689,20 @@ module D = struct
       (* What does it mean when such a path is just an ident that is local to
          another module ?*)
       log ~title:"D6" "D6: merging discourse of type %a" Logger.fmt
-        (Fun.flip Pprintast.longident longident);
+        (Fun.flip (Format_doc.compat Path.print) path);
       let type_discourse = trie_of_paths td.type_discourse in
-      ({ d with paths = Lid_trie.union d.paths type_discourse }, u_next)
+      ({ d with paths = Path_trie.union d.paths type_discourse }, u_next)
     | _ -> (d, u_next)
 
-  let add_from_u_to_d :
-      discourse -> U.u -> Longident.t * U.u_item -> discourse * U.u =
-   fun d u_next ((longident, item) as input) ->
-    log ~title:"D2" "D2: %a in U so in D (kind: %s, path: %a)" Logger.fmt
-      (Fun.flip Pprintast.longident longident)
-      (Shape.Sig_component_kind.to_string (fst item.U.item))
-      Logger.fmt
-      (Fun.flip (Format_doc.compat Path.print) (snd item.U.item));
+  let add_from_u_to_d : discourse -> U.u -> U.u_item -> discourse * U.u =
+   fun d u_next (item as input) ->
+    log ~title:"D2" "D2: %a in U so in D (kind: %s)" Logger.fmt
+      (Fun.flip (Format_doc.compat Path.print) (U.item_path item))
+      (Shape.Sig_component_kind.to_string (fst item.U.item));
     (* TODO: If item is already in paths we should skip adding it (and more
        importantly, skip the consequences!) *)
-    let d = { d with paths = Lid_trie.add longident item.item d.paths } in
+    let kind, path = item.item in
+    let d = { d with paths = Path_trie.add path kind d.paths } in
     (* In some cases, [consequences] tries to load its own compilation unit,
        which (inconsistently to our understanding) fails.
 
@@ -761,29 +734,29 @@ module D = struct
   let of_U u =
     log_recap ~title:"U" "U at start of D.of_U:\n%a" Logger.fmt
       (Fun.flip U.pp_u u);
-    let is_empty u = Lid_map.is_empty u.U.u_paths in
-    let has_been_added lid item old_u =
-      match Lid_map.find_opt lid old_u with
+    let is_empty u = Path.Map.is_empty u.U.u_paths in
+    let has_been_added item old_u =
+      match Path.Map.find_opt (U.item_path item) old_u with
       | None -> false
       | Some set -> U.ItemSet.mem item set
     in
     let rec add_u_to_d d u old_u =
       let d, u_next =
-        Lid_map.to_seq u.U.u_paths
+        Path.Map.to_seq u.U.u_paths
         |> Seq.fold_left
-             (fun (d, u_next) (lid, (x : U.ItemSet.t)) ->
+             (fun (d, u_next) (_path, (x : U.ItemSet.t)) ->
                U.ItemSet.fold
                  (fun item (d, u_next) ->
-                   if has_been_added lid item old_u then (d, u_next)
-                   else add_from_u_to_d d u_next (lid, item))
+                   if has_been_added item old_u then (d, u_next)
+                   else add_from_u_to_d d u_next item)
                  x (d, u_next))
              (d, U.empty_u)
       in
       let d =
         { d with
           substs =
-            Lid_map.union
-              (fun _ a b -> Some (Lid_set.union a b))
+            Path.Map.union
+              (fun _ a b -> Some (Path.Set.union a b))
               d.substs u.U.substs
         }
       in
@@ -796,8 +769,8 @@ module D = struct
     in
     let d =
       add_u_to_d
-        { paths = u.U.discourse; substs = Lid_map.empty }
-        u Lid_map.empty
+        { paths = u.U.discourse; substs = Path.Map.empty }
+        u Path.Map.empty
     in
     log_recap ~title:"D" "Final D:\n%a" Logger.fmt (Fun.flip pp_d d);
     d

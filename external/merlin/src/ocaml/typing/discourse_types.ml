@@ -44,116 +44,170 @@ let pp_paths ppf t =
 
 module String_map = Map.Make (String)
 
-module Lid_trie = struct
-  type t = Trie of Paths.t * t String_map.t
+module Kinds = Set.Make (struct
+  type t = Shape.Sig_component_kind.t
 
-  let pp_paths fmt paths =
-    let open Format in
-    fprintf fmt "@[<1>[%a]@]" pp_paths paths
+  (* Only constant constructors: structural comparison is exact. *)
+  let compare = Stdlib.compare
+end)
 
-  let rec pp fmt (Trie (paths, tries)) =
-    let open Format in
-    let pp_map fmt (id, trie) =
-      Format.fprintf fmt "@[<v 2>%s: %a@]" id pp trie
+module Segment = struct
+  (* One step of a path: [Root] is the ident a path starts with, [Apply] holds
+     a whole functor argument (so a substitution can replace an argument but
+     not reach inside one), [Extra] a [Pextra_ty] suffix. *)
+  type t =
+    | Root of Ident.t
+    | Dot of string
+    | Apply of Path.t
+    | Extra of Path.extra_ty
+
+  let rank = function
+    | Root _ -> 0
+    | Dot _ -> 1
+    | Apply _ -> 2
+    | Extra _ -> 3
+
+  let compare s s' =
+    match (s, s') with
+    | Root i, Root i' -> Ident.compare i i'
+    | Dot n, Dot n' -> String.compare n n'
+    | Apply p, Apply p' -> Path.compare p p'
+    | Extra e, Extra e' -> Path.compare_extra e e'
+    | (Root _ | Dot _ | Apply _ | Extra _), _ -> Int.compare (rank s) (rank s')
+
+  let print ppf = function
+    | Root id -> Ident.print ppf id
+    | Dot name -> Format.pp_print_string ppf name
+    | Apply p -> Format.fprintf ppf "(%a)" (Format_doc.compat Path.print) p
+    | Extra (Pcstr_ty c) -> Format.fprintf ppf "#cstr:%s" c
+    | Extra Pext_ty -> Format.pp_print_string ppf "#ext"
+    | Extra Punboxed_ty -> Format.pp_print_string ppf "#unboxed"
+end
+
+module Segment_map = Map.Make (Segment)
+
+(* TODO: rename to [Path_trie], along with its users. *)
+module Path_trie = struct
+  (* Paths are stored one segment per edge, so the position of a node in the
+     trie is the path it stands for; a node only records the kinds that path is
+     known under. [Kinds.empty] marks a node that is a mere prefix. A root is
+     such a node: it has no kinds and all its children are [Root] segments. *)
+  type t = Trie of Kinds.t * t Segment_map.t
+
+  let pp_kinds fmt kinds =
+    let pp_sep fmt () = Format.fprintf fmt ";@;" in
+    Format.fprintf fmt "@[<1>[%a]@]"
+      (Format.pp_print_list ~pp_sep (fun fmt kind ->
+           Format.pp_print_string fmt (Shape.Sig_component_kind.to_string kind)))
+      (Kinds.elements kinds)
+
+  let rec pp fmt (Trie (kinds, tries)) =
+    Format.fprintf fmt "%a :> %a" pp_kinds kinds
+      (Format.pp_print_seq (fun fmt (segment, trie) ->
+           Format.fprintf fmt "@[<v 2>%a: %a@]" Segment.print segment pp trie))
+      (Segment_map.to_seq tries)
+
+  let node ?(children = Segment_map.empty) kinds = Trie (kinds, children)
+
+  let empty = node Kinds.empty
+
+  let is_empty (Trie (_, children)) = Segment_map.is_empty children
+
+  let trie_of_path ?children path kinds =
+    let s_node (segment : Segment.t) acc =
+      node ~children:(Segment_map.singleton segment acc) Kinds.empty
     in
-    Format.fprintf fmt "%a :> %a" pp_paths paths (pp_print_seq pp_map)
-      (String_map.to_seq tries)
-
-  let empty = Trie (Paths.empty, String_map.empty)
-
-  let is_empty (Trie (_, children)) = String_map.is_empty children
-
-  let node ?(children = String_map.empty) paths = Trie (paths, children)
-
-  let trie_of_lid ?children lid paths =
-    let rec aux acc lid =
-      match (lid : Longident.t) with
-      | Lident id ->
-        let map = String_map.singleton id acc in
-        Trie (Paths.empty, map)
-      | Ldot (lid, id) ->
-        let acc = Trie (Paths.empty, String_map.singleton id.txt acc) in
-        aux acc lid.txt
-      | Lapply (lid, arg_lid) ->
-        let arg =
-          let acc = Trie (Paths.empty, String_map.singleton ")" acc) in
-          aux acc arg_lid.txt
-        in
-        aux (Trie (Paths.empty, String_map.singleton "(" arg)) lid.txt
+    let rec aux acc (path : Path.t) =
+      match path with
+      | Pident id -> s_node (Root id) acc
+      | Pdot (path, name) -> aux (s_node (Dot name) acc) path
+      | Papply (path, arg) -> aux (s_node (Apply arg) acc) path
+      | Pextra_ty (path, extra) -> aux (s_node (Extra extra) acc) path
     in
-    aux (node ?children paths) lid
+    aux (node ?children kinds) path
 
-  let singleton lid path = trie_of_lid lid (Paths.singleton path)
-
-  let rec union (Trie (p1, m1)) (Trie (p2, m2)) =
+  let rec union (Trie (k, m)) (Trie (k', m')) =
     Trie
-      ( Paths.union p1 p2,
-        String_map.union (fun _key t1 t2 -> Some (union t1 t2)) m1 m2 )
+      ( Kinds.union k k',
+        Segment_map.union (fun _seg t t' -> Some (union t t')) m m' )
 
-  let add lid path t =
-    let t' = trie_of_lid lid (Paths.singleton path) in
+  let singleton path kind = trie_of_path path (Kinds.singleton kind)
+
+  let add path kind t =
+    let t' = trie_of_path path (Kinds.singleton kind) in
     union t t'
 
-  let take name (Trie (paths, tries)) =
-    let l, t, r = String_map.split name tries in
-    let t = Option.map (fun t -> Trie (paths, String_map.singleton name t)) t in
-    (t, Trie (paths, String_map.union (fun _ _ _ -> assert false) l r))
+  (* Takes the paths rooted at [id] out of [t]. TODO: callers used to take by
+     name, they now have to provide the ident itself. *)
+  let take id (Trie (kinds, children)) =
+    let root = Segment.Root id in
+    match Segment_map.find_opt root children with
+    | None -> (None, Trie (kinds, children))
+    | Some t ->
+      ( Some (Trie (kinds, Segment_map.singleton root t)),
+        Trie (kinds, Segment_map.remove root children) )
 
-  let rec reach (Trie (_, tries) as t) lid =
-    match (lid : Longident.t) with
-    | Lident name -> String_map.find_opt name tries
-    | Ldot (lid, name) ->
-      let parent = reach t lid.txt in
-      Option.bind parent (fun (Trie (_, tries)) ->
-          String_map.find_opt name.txt tries)
-    | Lapply (lid, arg_lid) ->
-      let parent = reach t lid.txt in
-      Option.bind parent (fun (Trie (_, tries)) ->
-          let arg_trie = String_map.find_opt "(" tries in
-          let arg_enc = Option.bind arg_trie (fun t -> reach t arg_lid.txt) in
-          Option.bind arg_enc (fun (Trie (_, tries)) ->
-              String_map.find_opt ")" tries))
+  let reach t path =
+    let child (Trie (_, children)) (segment : Segment.t) =
+      Segment_map.find_opt segment children
+    in
+    let rec aux (path : Path.t) =
+      match path with
+      | Pident id -> child t (Root id)
+      | Pdot (p, name) -> descend p (Dot name)
+      | Papply (p, arg) -> descend p (Apply arg)
+      | Pextra_ty (p, extra) -> descend p (Extra extra)
+    and descend p (segment : Segment.t) =
+      Option.bind (aux p) (fun t -> child t segment)
+    in
+    aux path
 
-  let to_seq t =
-    let mknoloc = Location.mknoloc in
-    let rec aux lid_acc (Trie (paths, tries)) seq =
+  (* The path of a node is its position in the trie: [Root] segments start a
+     path, the other ones extend the path of their parent. *)
+  let to_seq (Trie (_root_kinds, roots)) =
+    let root : Segment.t -> Path.t = function
+      | Root id -> Pident id
+      | Dot _ | Apply _ | Extra _ ->
+        Misc.fatal_error "Discourse_types: path trie root is not an ident"
+    in
+    let extend path : Segment.t -> Path.t = function
+      | Dot name -> Pdot (path, name)
+      | Apply arg -> Papply (path, arg)
+      | Extra extra -> Pextra_ty (path, extra)
+      | Root _ -> Misc.fatal_error "Discourse_types: nested path trie root"
+    in
+    let rec aux path (Trie (kinds, tries)) seq =
       let seq () =
-        String_map.fold
-          (fun name t acc ->
-            let lid =
-              match (lid_acc, name) with
-              | None :: tl, _ -> Some (Longident.Lident name) :: tl
-              | l, "(" -> None :: l
-              | Some arg :: Some lid :: tl, ")" ->
-                Some (Longident.Lapply (mknoloc lid, mknoloc arg)) :: tl
-              | Some lid :: tl, _ ->
-                Some (Longident.Ldot (mknoloc lid, mknoloc name)) :: tl
-              | _ -> assert false
-            in
-            aux lid t acc)
+        Segment_map.fold
+          (fun segment t acc -> aux (extend path segment) t acc)
           tries seq
       in
-      if not (Paths.is_empty paths) then
-        Seq.Cons ((Option.get (List.hd lid_acc), paths), seq)
+      if not (Kinds.is_empty kinds) then Seq.Cons ((path, kinds), seq)
       else seq ()
     in
-    fun () -> aux [ None ] t Seq.Nil
+    fun () ->
+      Segment_map.fold
+        (fun segment t acc -> aux (root segment) t acc)
+        roots Seq.Nil
 
   let size t =
-    let rec aux acc (Trie (paths, tries)) =
-      String_map.fold
+    let rec aux acc (Trie (kinds, tries)) =
+      Segment_map.fold
         (fun _ t acc -> aux (1 + acc) t)
         tries
-        (Paths.cardinal paths + acc)
+        (Kinds.cardinal kinds + acc)
     in
     aux 0 t
 
-  let pp_lid_paths ppf (lid, paths) =
-    Format.fprintf ppf "@[<2>%a@ %a@]" Pprintast.longident lid pp_paths paths
+  let pp_path_kinds ppf (path, kinds) =
+    Format.fprintf ppf "@[<2>%a@ %a@]"
+      (Format_doc.compat Path.print)
+      path pp_kinds kinds
+
   let pp_seq fmt t =
     let pp_sep fmt () = Format.fprintf fmt ";@ " in
     Format.fprintf fmt "%a"
-      (Format.pp_print_seq ~pp_sep pp_lid_paths)
+      (Format.pp_print_seq ~pp_sep pp_path_kinds)
       (to_seq t)
 end
 
@@ -164,10 +218,24 @@ let add = Paths.add
 let union = Paths.union
 let pp = pp_paths
 
-type discourse = { paths : Lid_trie.t; substs : Lid_set.t Lid_map.t }
+(* A substitution maps a path to the paths it can be replaced with. *)
+type substs = Path.Set.t Path.Map.t
 
-let pp_map fmt t =
+type discourse = { paths : Path_trie.t; substs : substs }
+
+let pp_path = Format_doc.compat Path.print
+
+let pp_substs fmt (t : substs) =
   let pp_sep fmt () = Format.fprintf fmt ";@ " in
+  let pp_replacements fmt paths =
+    Format.fprintf fmt "@[<1>[%a]@]"
+      (Format.pp_print_list ~pp_sep pp_path)
+      (Path.Set.elements paths)
+  in
+  let pp_binding fmt (path, replacements) =
+    Format.fprintf fmt "@[<2>%a ->@ %a@]" pp_path path pp_replacements
+      replacements
+  in
   Format.fprintf fmt "%a"
-    (Format.pp_print_seq ~pp_sep Lid_trie.pp_lid_paths)
-    (Lid_map.to_seq t)
+    (Format.pp_print_seq ~pp_sep pp_binding)
+    (Path.Map.to_seq t)
