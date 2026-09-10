@@ -110,187 +110,8 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
   > EOF
 
   $ $MERLIN single type-enclosing -position 3:5 \
-  > -log-file - -log-section discourse-recap \
-  > -nostdlib \
-  > -filename test.ml < test.ml 2>&1| sed -E 's/^# [0-9]+.[0-9]+/#/'
-  # discourse-recap - U
-  U at start of D.of_U:
-  { u_paths =
-    [Async -> [{item = (module, Async!); env = with env}];
-    Let_syntax -> [{item = (module, Async!.Let_syntax); env = with env}];
-    Let_syntax.return ->
-      [{item = (value, Async!.Let_syntax.return); env = with env}]];
-    substs =
-    [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax];
-    Async_kernel__.Deferred -> [Deferred];
-    Async_kernel__Deferred.Let_syntax.Let_syntax -> [Let_syntax]] }
-  # discourse-recap - next_U
-  next_U (non-empty, looping):
-  { u_paths =
-    [Deferred -> [{item = (module, Async!.Deferred); env = with env}];
-    Let_syntax ->
-      [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
-        env = with env}];
-    Deferred.Let_syntax ->
-      [{item = (module, Async!.Deferred.Let_syntax); env = with env}];
-    Deferred.Let_syntax.Let_syntax ->
-      [{item = (module, Async!.Deferred.Let_syntax.Let_syntax); env = with env}]];
-    substs =
-    [] }
-  # discourse-recap - next_U
-  next_U (non-empty, looping):
-  { u_paths =
-    [Deferred ->
-       [{item = (module, Async_kernel__Deferred!); env = with env};
-        {item = (module, Async_kernel__!.Deferred); env = with env}];
-    Deferred.Let_syntax ->
-      [{item = (module, Async_kernel__Deferred!.Let_syntax); env = with env}];
-    Deferred.Let_syntax.Let_syntax ->
-      [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
-        env = with env}]];
-    substs =
-    [] }
-  # discourse-recap - next_U
-  next_U (non-empty, looping):
-  { u_paths =
-    [Async_kernel__Deferred ->
-       [{item = (module, Async_kernel__Deferred!); env = with env}];
-    Deferred -> [{item = (module, Async_kernel__Deferred!); env = with env}]];
-    substs =
-    [] }
-  # discourse-recap - D
-  Final D:
-  Discourse {
-    size = 137;
-    paths =
-    unit [unit!];
-    string [string!];
-    or_null [or_null!];
-    option [option!];
-    nativeint [nativeint!];
-    list [list!];
-    lexing_position [lexing_position!];
-    lazy_t [lazy_t!];
-    int8x64 [int8x64!];
-    int8x32 [int8x32!];
-    int8x16 [int8x16!];
-    int8 [int8!];
-    int64x8 [int64x8!];
-    int64x4 [int64x4!];
-    int64x2 [int64x2!];
-    int64 [int64!];
-    int32x8 [int32x8!];
-    int32x4 [int32x4!];
-    int32x16 [int32x16!];
-    int32 [int32!];
-    int16x8 [int16x8!];
-    int16x32 [int16x32!];
-    int16x16 [int16x16!];
-    int16 [int16!];
-    int [int!];
-    idx_mut [idx_mut!];
-    idx_imm [idx_imm!];
-    iarray [iarray!];
-    floatarray [floatarray!];
-    float64x8 [float64x8!];
-    float64x4 [float64x4!];
-    float64x2 [float64x2!];
-    float32x8 [float32x8!];
-    float32x4 [float32x4!];
-    float32x16 [float32x16!];
-    float32 [float32!];
-    float16x8 [float16x8!];
-    float16x32 [float16x32!];
-    float16x16 [float16x16!];
-    float [float!];
-    extension_constructor [extension_constructor!];
-    expr [expr!];
-    exn [exn!];
-    eval [eval!];
-    eff [eff!];
-    continuation [continuation!];
-    char [char!];
-    bytes [bytes!];
-    bool [bool!];
-    atomic_loc [atomic_loc!];
-    array [array!];
-    Let_syntax
-      [Async!.Let_syntax; Async_kernel__Deferred!.Let_syntax.Let_syntax];
-    Let_syntax.return
-      [Async!.Let_syntax.return;
-       Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Deferred
-      [Async_kernel__Deferred!; Async!.Deferred; Async_kernel__!.Deferred];
-    Deferred.t [Async_kernel__Deferred!.t];
-    Deferred.Let_syntax
-      [Async_kernel__Deferred!.Let_syntax; Async!.Deferred.Let_syntax];
-    Deferred.Let_syntax.Let_syntax
-      [Async_kernel__Deferred!.Let_syntax.Let_syntax;
-       Async!.Deferred.Let_syntax.Let_syntax];
-    Deferred.Let_syntax.Let_syntax.return
-      [Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Async_kernel__Deferred [Async_kernel__Deferred!];
-    Async_kernel__Deferred.t [Async_kernel__Deferred!.t];
-    Async_kernel__Deferred.Let_syntax [Async_kernel__Deferred!.Let_syntax];
-    Async_kernel__.Deferred [Async_kernel__!.Deferred];
-    Async [Async!];
-    Async.Let_syntax [Async!.Let_syntax];
-    Async.Deferred [Async!.Deferred];
-    substs =
-    [Async_kernel__Deferred -> [Deferred; Async.Deferred];
-    Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async_kernel__Deferred; Deferred];
-    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
-    Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Deferred.Let_syntax.Let_syntax]]
-    }
-  # discourse-recap - U
-  U at start of D.of_U:
-  { u_paths =
-    [];
-    substs =
-    [Async_kernel__Deferred -> [Deferred; Async.Deferred];
-    Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async_kernel__Deferred; Deferred];
-    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
-    Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Deferred.Let_syntax.Let_syntax]] }
-  # discourse-recap - D
-  Final D:
-  Discourse {
-    size = 0;
-    paths =
-    ;
-    substs =
-    [Async_kernel__Deferred -> [Deferred; Async.Deferred];
-    Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async_kernel__Deferred; Deferred];
-    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
-    Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Deferred.Let_syntax.Let_syntax]]
-    }
-  {
-    "class": "return",
-    "value": [
-      {
-        "start": {
-          "line": 3,
-          "col": 4
-        },
-        "end": {
-          "line": 3,
-          "col": 7
-        },
-        "type": "int Deferred.t",
-        "tail": "no"
-      }
-    ],
-    "notifications": []
-  }
+  > -filename test.ml < test.ml | jq '.value[].type'
+  "int Deferred.t"
 
 Dump the discourse so regressions show up as a diff in this test:
 
@@ -300,148 +121,152 @@ Dump the discourse so regressions show up as a diff in this test:
   # discourse-recap - U
   U at start of D.of_U:
   { u_paths =
-    [Async -> [{item = (module, Async!); env = with env}];
-    Let_syntax -> [{item = (module, Async!.Let_syntax); env = with env}];
-    Let_syntax.return ->
+    [Async! ->
+       [{item = (module, Async!); env = with env};
+        {item = (module, Async!); env = with env}];
+    Async!.Let_syntax -> [{item = (module, Async!.Let_syntax); env = with env}];
+    Async!.Let_syntax.return ->
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
-    [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax];
-    Async_kernel__.Deferred -> [Deferred];
-    Async_kernel__Deferred.Let_syntax.Let_syntax -> [Let_syntax]] }
+    Deferred -> [Deferred];
+    Let_syntax -> [Let_syntax];
+    Async_kernel__!.Deferred -> [Deferred];
+    Async_kernel__Deferred!.Let_syntax.Let_syntax -> [Let_syntax] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
-    [Deferred -> [{item = (module, Async!.Deferred); env = with env}];
-    Let_syntax ->
+    [Async! -> [{item = (module, Async!); env = with env}];
+    Async!.Deferred -> [{item = (module, Async!.Deferred); env = with env}];
+    Async!.Deferred.Let_syntax ->
+      [{item = (module, Async!.Deferred.Let_syntax); env = with env}];
+    Async_kernel__Deferred!.Let_syntax.Let_syntax ->
       [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
         env = with env}];
-    Deferred.Let_syntax ->
-      [{item = (module, Async!.Deferred.Let_syntax); env = with env}];
-    Deferred.Let_syntax.Let_syntax ->
+    Async!.Deferred.Let_syntax.Let_syntax ->
       [{item = (module, Async!.Deferred.Let_syntax.Let_syntax); env = with env}]];
     substs =
-    [] }
+     }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
-    [Deferred ->
-       [{item = (module, Async_kernel__Deferred!); env = with env};
-        {item = (module, Async_kernel__!.Deferred); env = with env}];
-    Deferred.Let_syntax ->
+    [Async_kernel__! -> [{item = (module, Async_kernel__!); env = with env}];
+    Async_kernel__Deferred! ->
+      [{item = (module, Async_kernel__Deferred!); env = with env}];
+    Async_kernel__!.Deferred ->
+      [{item = (module, Async_kernel__!.Deferred); env = with env}];
+    Async_kernel__Deferred!.Let_syntax ->
       [{item = (module, Async_kernel__Deferred!.Let_syntax); env = with env}];
-    Deferred.Let_syntax.Let_syntax ->
+    Async_kernel__Deferred!.Let_syntax.Let_syntax ->
       [{item = (module, Async_kernel__Deferred!.Let_syntax.Let_syntax);
         env = with env}]];
     substs =
-    [] }
+     }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
-    [Async_kernel__Deferred ->
-       [{item = (module, Async_kernel__Deferred!); env = with env}];
-    Deferred -> [{item = (module, Async_kernel__Deferred!); env = with env}]];
+    [Async_kernel__Deferred! ->
+       [{item = (module, Async_kernel__Deferred!); env = with env}]];
     substs =
-    [] }
+     }
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 137;
+    size = 134;
     paths =
-    unit [unit!];
-    string [string!];
-    or_null [or_null!];
-    option [option!];
-    nativeint [nativeint!];
-    list [list!];
-    lexing_position [lexing_position!];
-    lazy_t [lazy_t!];
-    int8x64 [int8x64!];
-    int8x32 [int8x32!];
-    int8x16 [int8x16!];
-    int8 [int8!];
-    int64x8 [int64x8!];
-    int64x4 [int64x4!];
-    int64x2 [int64x2!];
-    int64 [int64!];
-    int32x8 [int32x8!];
-    int32x4 [int32x4!];
-    int32x16 [int32x16!];
-    int32 [int32!];
-    int16x8 [int16x8!];
-    int16x32 [int16x32!];
-    int16x16 [int16x16!];
-    int16 [int16!];
-    int [int!];
-    idx_mut [idx_mut!];
-    idx_imm [idx_imm!];
-    iarray [iarray!];
-    floatarray [floatarray!];
-    float64x8 [float64x8!];
-    float64x4 [float64x4!];
-    float64x2 [float64x2!];
-    float32x8 [float32x8!];
-    float32x4 [float32x4!];
-    float32x16 [float32x16!];
-    float32 [float32!];
-    float16x8 [float16x8!];
-    float16x32 [float16x32!];
-    float16x16 [float16x16!];
-    float [float!];
-    extension_constructor [extension_constructor!];
-    expr [expr!];
-    exn [exn!];
-    eval [eval!];
-    eff [eff!];
-    continuation [continuation!];
-    char [char!];
-    bytes [bytes!];
-    bool [bool!];
-    atomic_loc [atomic_loc!];
-    array [array!];
-    Let_syntax
-      [Async!.Let_syntax; Async_kernel__Deferred!.Let_syntax.Let_syntax];
-    Let_syntax.return
-      [Async!.Let_syntax.return;
-       Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Deferred
-      [Async_kernel__Deferred!; Async!.Deferred; Async_kernel__!.Deferred];
-    Deferred.t [Async_kernel__Deferred!.t];
-    Deferred.Let_syntax
-      [Async_kernel__Deferred!.Let_syntax; Async!.Deferred.Let_syntax];
-    Deferred.Let_syntax.Let_syntax
-      [Async_kernel__Deferred!.Let_syntax.Let_syntax;
-       Async!.Deferred.Let_syntax.Let_syntax];
-    Deferred.Let_syntax.Let_syntax.return
-      [Async_kernel__Deferred!.Let_syntax.Let_syntax.return];
-    Async_kernel__Deferred [Async_kernel__Deferred!];
-    Async_kernel__Deferred.t [Async_kernel__Deferred!.t];
-    Async_kernel__Deferred.Let_syntax [Async_kernel__Deferred!.Let_syntax];
-    Async_kernel__.Deferred [Async_kernel__!.Deferred];
-    Async [Async!];
-    Async.Let_syntax [Async!.Let_syntax];
-    Async.Deferred [Async!.Deferred];
+    Let_syntax [module];
+    Deferred [module];
+    Async_kernel__Deferred! [module];
+    Async_kernel__Deferred!.t [type];
+    Async_kernel__Deferred!.Let_syntax [module];
+    Async_kernel__Deferred!.Let_syntax.Let_syntax [module];
+    Async_kernel__Deferred!.Let_syntax.Let_syntax.return [value];
+    Async_kernel__! [module];
+    Async_kernel__!.Deferred0 [module];
+    Async_kernel__!.Deferred [module];
+    Async! [module];
+    Async!.Let_syntax [module];
+    Async!.Let_syntax.return [value];
+    Async!.Deferred [module];
+    Async!.Deferred.Let_syntax [module];
+    Async!.Deferred.Let_syntax.Let_syntax [module];
+    float64x8! [type];
+    float32x16! [type];
+    float16x32! [type];
+    int64x8! [type];
+    int32x16! [type];
+    int16x32! [type];
+    int8x64! [type];
+    float64x4! [type];
+    float32x8! [type];
+    float16x16! [type];
+    int64x4! [type];
+    int32x8! [type];
+    int16x16! [type];
+    int8x32! [type];
+    float64x2! [type];
+    float32x4! [type];
+    float16x8! [type];
+    int64x2! [type];
+    int32x4! [type];
+    int16x8! [type];
+    int8x16! [type];
+    idx_mut! [type];
+    idx_imm! [type];
+    or_null! [type];
+    eval! [type];
+    expr! [type];
+    lexing_position! [type];
+    atomic_loc! [type];
+    iarray! [type];
+    floatarray! [type];
+    extension_constructor! [type];
+    string! [type];
+    lazy_t! [type];
+    int64! [type];
+    int32! [type];
+    int16! [type];
+    int8! [type];
+    nativeint! [type];
+    option! [type];
+    list! [type];
+    array! [type];
+    continuation! [type];
+    eff! [type];
+    exn! [type];
+    unit! [type];
+    bool! [type];
+    float32! [type];
+    float! [type];
+    bytes! [type];
+    char! [type];
+    int! [type];
     substs =
-    [Async_kernel__Deferred -> [Deferred; Async.Deferred];
-    Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async_kernel__Deferred; Deferred];
-    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
-    Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Deferred.Let_syntax.Let_syntax]]
+    [Async_kernel__Deferred! -> [Async!.Deferred; Async_kernel__!.Deferred];
+    Async_kernel__Deferred0! -> [Async_kernel__!.Deferred0];
+    Deferred -> [Deferred];
+    Let_syntax -> [Let_syntax];
+    Async!.Deferred -> [Async_kernel__!.Deferred];
+    Async!.Let_syntax -> [Async!.Deferred.Let_syntax.Let_syntax];
+    Async_kernel__!.Deferred -> [Async_kernel__Deferred!; Deferred];
+    Async_kernel__Deferred!.Let_syntax -> [Async!.Deferred.Let_syntax];
+    Async_kernel__Deferred!.Let_syntax.Let_syntax ->
+      [Let_syntax; Async!.Let_syntax; Async!.Deferred.Let_syntax.Let_syntax]]
     }
   # discourse-recap - U
   U at start of D.of_U:
   { u_paths =
     [];
     substs =
-    [Async_kernel__Deferred -> [Deferred; Async.Deferred];
-    Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async_kernel__Deferred; Deferred];
-    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
-    Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Deferred.Let_syntax.Let_syntax]] }
+    Async_kernel__Deferred! -> [Async!.Deferred; Async_kernel__!.Deferred];
+    Async_kernel__Deferred0! -> [Async_kernel__!.Deferred0];
+    Deferred -> [Deferred];
+    Let_syntax -> [Let_syntax];
+    Async!.Deferred -> [Async_kernel__!.Deferred];
+    Async!.Let_syntax -> [Async!.Deferred.Let_syntax.Let_syntax];
+    Async_kernel__!.Deferred -> [Async_kernel__Deferred!; Deferred];
+    Async_kernel__Deferred!.Let_syntax -> [Async!.Deferred.Let_syntax];
+    Async_kernel__Deferred!.Let_syntax.Let_syntax ->
+      [Let_syntax; Async!.Let_syntax; Async!.Deferred.Let_syntax.Let_syntax] }
   # discourse-recap - D
   Final D:
   Discourse {
@@ -449,13 +274,16 @@ Dump the discourse so regressions show up as a diff in this test:
     paths =
     ;
     substs =
-    [Async_kernel__Deferred -> [Deferred; Async.Deferred];
-    Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
-    Async_kernel__.Deferred -> [Async_kernel__Deferred; Deferred];
-    Async_kernel__Deferred.Let_syntax -> [Deferred.Let_syntax];
-    Async_kernel__Deferred.Let_syntax.Let_syntax ->
-      [Let_syntax; Async.Let_syntax; Deferred.Let_syntax.Let_syntax]]
+    [Async_kernel__Deferred! -> [Async!.Deferred; Async_kernel__!.Deferred];
+    Async_kernel__Deferred0! -> [Async_kernel__!.Deferred0];
+    Deferred -> [Deferred];
+    Let_syntax -> [Let_syntax];
+    Async!.Deferred -> [Async_kernel__!.Deferred];
+    Async!.Let_syntax -> [Async!.Deferred.Let_syntax.Let_syntax];
+    Async_kernel__!.Deferred -> [Async_kernel__Deferred!; Deferred];
+    Async_kernel__Deferred!.Let_syntax -> [Async!.Deferred.Let_syntax];
+    Async_kernel__Deferred!.Let_syntax.Let_syntax ->
+      [Let_syntax; Async!.Let_syntax; Async!.Deferred.Let_syntax.Let_syntax]]
     }
   {
     "class": "return",
