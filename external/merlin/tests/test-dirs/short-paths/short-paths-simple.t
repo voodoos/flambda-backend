@@ -45,7 +45,7 @@ Simple alias on string and int
   $ $MERLIN single type-enclosing -short-paths -position 3:5 -filename sample.ml < sample.ml \
   > | tr '\r\n' ' ' \
   > | jq .value[0].type -r
-  string -> int
+  s_string -> s_int
 
 Simple alias on string and int, with ascription
 
@@ -62,4 +62,4 @@ Simple alias on string and int, with ascription
   $ $MERLIN single type-enclosing -short-paths -position 3:5 -filename sample.ml < sample.ml \
   > | tr '\r\n' ' ' \
   > | jq .value[0].type -r
-  string -> int
+  s_string -> s_int
