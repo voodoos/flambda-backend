@@ -101,11 +101,17 @@ let compare_longidents l1 l2 =
   if cost_diff <> 0 then cost_diff
   else Discourse_types.compare_longidents ~compare_strings l1 l2
 
-(* Adapted from out_type  *)
+let ident_scope id =
+  if Ident.is_predef id then Ident.highest_scope else Ident.scope id
+
+(* Adapted from out_type. Same weight but we favorize predefs.
+
+   TODO CR Ulysse there is room for adjustment here. Scope is not always a very
+   good metric, proximity of the last usage might be better. *)
 let path_size path =
   let name_penalty = Out_type.name_penalty in
   let rec size = function
-    | Path.Pident id -> (name_penalty (Ident.name id), -Ident.scope id)
+    | Path.Pident id -> (name_penalty (Ident.name id), -ident_scope id)
     | Pdot (p, id) | Pextra_ty (p, Pcstr_ty id) ->
       let l, b = size p in
       (name_penalty id + l, b)
