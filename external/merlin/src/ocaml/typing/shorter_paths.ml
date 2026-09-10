@@ -260,19 +260,28 @@ let restore_ignored_paths id =
       priority_queue := fill_queue t !priority_queue;
       not_in_env := remaining)
 
-let check_path env kind path =
-  try
-    match kind with
-    | Type -> Some (Env.find_type path env |> ignore)
-    | Module -> Some (Env.find_module_lazy path env |> ignore)
-    | Module_type -> Some (Env.find_modtype_lazy path env |> ignore)
-  with Not_found -> None
-
 let find_by_name env kind lid =
   match kind with
   | Type -> fst (Env.find_type_by_name lid env)
   | Module -> fst (Env.find_module_by_name_lazy lid env)
   | Module_type -> fst (Env.find_modtype_by_name_lazy lid env)
+
+let find_path_by_name env kind path =
+  let lid = Untypeast.lident_of_path path in
+  try Some (find_by_name env kind lid) with Not_found -> None
+
+let find_path env kind path =
+  try
+    let _ =
+      match kind with
+      | Type -> ignore (Env.find_type path env)
+      | Module -> ignore (Env.find_module_lazy path env)
+      | Module_type -> ignore (Env.find_modtype_lazy path env)
+    in
+    Some path
+  with Not_found -> find_path_by_name env kind path
+
+let check_path env kind path = Option.is_some @@ find_path env kind path
 
 let normalize env kind path =
   match kind with
@@ -329,7 +338,8 @@ let find_best_path env ~canon_path table target_kind =
     |> Seq.find_map (fun (kind, path) ->
         (* TODO we should probably have a kind*path map*)
         if kind <> target_kind then None
-        else check_path env kind path |> Option.map (Fun.const path))
+        else if check_path env kind path then Some path
+        else None)
 
 let improve_path env ~canon_path table kind path =
   find_best_path env ~canon_path table kind
@@ -350,11 +360,12 @@ let process_queue env state ~table ~canon_path target_kind best =
     | Seq.Cons ((kind, next_path), next) ->
       let next_level = compare next_path < 0 in
       if next_level then
-        begin match improve_path env ~canon_path table kind best_path with
+        begin match
+          improve_path env ~canon_path table target_kind best_path
+        with
         | Some best_path when compare_paths_weight best_path next_path < 0 ->
           log ~title:"fill_by_level"
-            "Finished level and found a name shorter than the previous level:\n\
-            \ %a"
+            "Finished level and found a name shorter than the next level:\n %a"
             Logger.fmt
             (Fun.flip path_print best_path);
           (Some best_path, state)
@@ -373,22 +384,23 @@ let process_queue env state ~table ~canon_path target_kind best =
            paths that cannot be looked-up in the environement directly. We can
            find by name instead. However we must then check that we did actually
            find the type we were looking (same ident) for and not an homonym. *)
-        check_path env kind path
+        find_path env kind path
       in
       match is_valid_in_current_env with
-      | Some _path_in_env -> begin
+      | Some path_in_env -> begin
         (* Even if it would feel natural to use Uids as keys in the table,
            Trying to `Env.find_*` them naively here would results in unwanted
            cmi loading. TODO: we could try to isolate these cases were that
            happen, but even then it's unclear which Uid we would use to identity
            them. *)
-        let canonical_path = normalize env kind path in
-        log ~title:"fill_by_level" "Updating table: %a -> { %a (%s) }"
-          Logger.fmt
+        let canonical_path = normalize env kind path_in_env in
+        log ~title:"fill_by_level"
+          "Updating table: %a -> { %a (%s) (in env: %a) }" Logger.fmt
           (fun fmt -> path_print fmt canonical_path)
           Logger.fmt
           (fun fmt -> path_print fmt path)
-          (string_of_kind kind);
+          (string_of_kind kind) Logger.fmt
+          (fun fmt -> path_print fmt path_in_env);
         let () =
           let update =
             match Path.Tbl.find_opt table canonical_path with
