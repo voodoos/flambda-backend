@@ -47,7 +47,7 @@ Some variation on partial opening
 
   $ $MERLIN single type-enclosing -short-paths -position 14:5 -filename sample.ml < sample.ml \
   > | jq .value[0].type -r
-  t -> t -> c * c
+  string -> string -> c * c
 
   $ cat > sample.ml <<EOF
   > module A = struct
@@ -98,4 +98,4 @@ Some variation on partial opening
 This should not be t -> t -> ... because in this env t is A.B.C.t not A.B.t
   $ $MERLIN single type-enclosing -short-paths -position 16:5 -filename sample.ml < sample.ml \
   > | jq .value[0].type -r
-  string -> string -> c * c
+  string -> string -> r * r
