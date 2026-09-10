@@ -330,40 +330,39 @@ module U = struct
      just to make sure they do.
   *)
 
-  let rec define_signature_for_open _env ~root_path (sg : Subst.Lazy.signature)
-      =
+  let rec define_signature_for_open ?root_path (sg : Subst.Lazy.signature) =
     List.iter
       (fun sig_item ->
         match (sig_item : Subst.Lazy.signature_item) with
         | Sig_type (id, _, _, _) ->
           log ~title:"U3" "U3: type %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          define_type ~from:`Open ~root_path id
+          define_type ~from:`Open ?root_path id
         | Sig_value (id, _, _) ->
           log ~title:"U3" "U3: value %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          define_value ~from:`Open ~root_path id
+          define_value ~from:`Open ?root_path id
         | Sig_typext (_, _, _, _) | Sig_jkind _ -> ()
         | Sig_module (id, Mp_present, { md_type = Mty_signature s; _ }, _, _) ->
           (* We recursively  bring everything that is direcelty defined in the
              opened module, but without following aliases. *)
           log ~title:"U3" "U3: module (present) %a brought in scope by open"
             Logger.fmt (Fun.flip Ident.print id);
-          let path = path_of_ident ~root_path id in
+          let path = path_of_ident ?root_path id in
           add_subst_g path (Pident id);
-          define ~from:`Open Module ~root_path id;
-          define_signature_for_open _env ~root_path:path s
+          define ~from:`Open Module ?root_path id;
+          define_signature_for_open ~root_path:path s
         | Sig_module (id, _, { md_type; _ }, _, _) ->
           log ~title:"U3" "U3: module %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          let path = path_of_ident ~root_path id in
+          let path = path_of_ident ?root_path id in
           let () =
             match md_type with
             | Mty_alias alias_path -> add_subst_g alias_path path
             | _ -> ()
           in
           add_subst_g path (Pident id);
-          define ~from:`Open Module ~root_path id
+          define ~from:`Open Module ?root_path id
           (* TODO Adding to U here fixes a few issues but we would prefer not to
              do it. *)
           (* g := *)
@@ -376,7 +375,7 @@ module U = struct
         | Sig_modtype (id, _, _) ->
           log ~title:"U3" "U3: module type %a brought in scope by open"
             Logger.fmt (Fun.flip Ident.print id);
-          define_modtype ~from:`Open ~root_path id
+          define_modtype ~from:`Open ?root_path id
         | Sig_class (_, _, _, _) | Sig_class_type (_, _, _, _) ->
           (* TODO: do *) ())
       (Subst.Lazy.force_signature_once sg)
@@ -391,7 +390,7 @@ module U = struct
         let root_path = Env.normalize_module_path None env path in
         let md = Env.find_module_lazy root_path env in
         match md.md_type with
-        | Mty_signature sg -> define_signature_for_open env ~root_path sg
+        | Mty_signature sg -> define_signature_for_open sg
         | _ -> ()
       with Not_found -> ()
     end
