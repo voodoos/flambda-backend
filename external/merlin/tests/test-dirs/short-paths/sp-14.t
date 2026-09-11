@@ -65,6 +65,13 @@ Normalization will stop here because 'a <> 'a Or_error.t
 
   $ $OCAMLC -c deferred_or_error.mli -open Async_kernel__ -o Async_kernel__Deferred_or_error
   $ $OCAMLC -c deferred_or_error.ml -open Async_kernel__ -o Async_kernel__Deferred_or_error
+  $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse Async_kernel__Deferred_or_error.cmi
+  Discourse:
+  Deferred: alias: Deferred1 [Async_kernel__!.Deferred1]
+    Async_kernel__!.Deferred1
+  
+  t: Deferred/317.t; Async_kernel__!.Or_error.t
+  return: t/318
 
 
   $ cat >deferred.ml <<'EOF'
@@ -80,14 +87,23 @@ Normalization will stop here because 'a <> 'a Or_error.t
 
   $ $OCAMLC -c deferred.mli -open Async_kernel__ -o Async_kernel__Deferred
   $ $OCAMLC -c deferred.ml -open Async_kernel__ -o Async_kernel__Deferred
-
+  $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse Async_kernel__Deferred.cmi
+  Discourse:
+  t: Async_kernel__!.Deferred1.t
+  return: t/291
+  Or_error: alias: Deferred_or_error [Async_kernel__!.Deferred_or_error]
+    Async_kernel__!.Deferred_or_error
+  
 
   $ cat >async_kernel.ml <<'EOF'
   > module Deferred = Deferred
   > EOF
 
   $ $OCAMLC -c async_kernel.ml -open Async_kernel__
-
+  $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse async_kernel.cmi
+  Discourse:
+  Deferred: alias: Deferred [Async_kernel__!.Deferred] Async_kernel__!.Deferred
+  
 
   $ cd ..
   $ mkdir async
@@ -107,6 +123,17 @@ Normalization will stop here because 'a <> 'a Or_error.t
   > EOF
 
   $ $OCAMLC -c async.ml -I ../async_kernel
+  $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse async.cmi
+  Discourse:
+  Deferred: 
+  Deferred.t: 
+  Deferred.return: t/346
+  Deferred.Or_error: 
+  Deferred.Or_error.Deferred: alias: Deferred1 [Async_kernel__!.Deferred1]
+    Async_kernel__!.Deferred1
+  
+  Deferred.Or_error.t: 
+  Deferred.Or_error.return: t/350
 
   $ cd ..
 
@@ -129,4 +156,4 @@ Normalization will stop here because 'a <> 'a Or_error.t
 We expect int Deferred.Or_error.t
   $ $MERLIN single type-enclosing -position 3:5 \
   > -filename test.ml < test.ml | jq '.value[0].type'
-  "int Deferred.Or_error.t"
+  "int Async_kernel.Deferred.Or_error.t"

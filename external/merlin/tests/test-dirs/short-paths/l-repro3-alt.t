@@ -60,4 +60,4 @@ Short-paths should prefer Header.t but prints Lib_b.Header.t.
 
   $ $MERLIN single type-enclosing -position 2:27 -index 0 \
   > -filename usage.ml <usage.ml | jq '.value[0].type'
-  "Header.t"
+  "State.Header.t"
