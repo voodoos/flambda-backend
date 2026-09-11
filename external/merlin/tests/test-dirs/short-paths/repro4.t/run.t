@@ -60,4 +60,4 @@ Then the following test should return Repro4__.Kind.t but Repro4.Kind.t is not
 the same type. There is no good public name for this type.
   $ $MERLIN single type-enclosing -position 1:34 -index 0 \
   > -filename usage/usage.ml <usage/usage.ml | jq '.value[0].type'
-  "'a Repro4_priv__Kind.t"
+  "'a Repro4__.Kind.t"

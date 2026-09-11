@@ -329,15 +329,10 @@ let find_path_by_name env kind apparent_path full_path =
 
 (* [full_path] is used to disambiguate when a lookup by name is required *)
 let find_path env kind ~full_path path =
-  try
-    let _ =
-      match kind with
-      | Type -> ignore (Env.find_type path env)
-      | Module -> ignore (Env.find_module_lazy path env)
-      | Module_type -> ignore (Env.find_modtype_lazy path env)
-    in
-    Some path
-  with Not_found -> find_path_by_name env kind path full_path
+  (* TODO CR Ulysse if required we might use a shortcut here with "find_"
+     functions but these must be treated carefully as they do allow hidden
+     module to be used. (breaks l-repro2 for example) *)
+  find_path_by_name env kind path full_path
 
 let check_path env kind ~full_path path =
   Option.is_some @@ find_path env kind ~full_path path

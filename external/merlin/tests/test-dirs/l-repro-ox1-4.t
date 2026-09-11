@@ -30,5 +30,5 @@ We expect "type t = Make_set(Import.Foo).t"
   $ $MERLIN single type-enclosing -position 12:0 \
   > -log-file log -log-section short-paths \
   > -filename main.ml <main.ml | jq '.value[0].type'
-  "type t = t"
+  "type t = Make_set(Import.Foo).t"
 

@@ -68,7 +68,7 @@ Usage
   > B usage
   > EOF
 
-FIXME: We expect Repro2_main.Topic.t
-  $ $MERLIN single type-enclosing -log-file log -log-section discourse-recap,discourse-verbose -position 1:40 -index 0 \
+We expect Repro2_main.Topic.t
+  $ $MERLIN single type-enclosing -position 1:40 -index 0 \
   > -filename usage/usage.ml <usage/usage.ml | jq '.value[0].type'
-  "Topic.t -> Topic_name.t option"
+  "Repro2_main.Topic.t -> Repro2_main.Topic_name.t option"
