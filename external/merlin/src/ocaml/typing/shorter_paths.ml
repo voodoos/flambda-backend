@@ -143,18 +143,21 @@ let string_of_kind = function
 
 module Path_set = struct
   module T = struct
-    type t = kind * Path.t
+    type t = kind * Path.t * Path.t
 
-    let compare (k1, p1) (k2, p2) =
+    let compare (k1, p1, fp1) (k2, p2, fp2) =
       let c = compare_paths_weight p1 p2 in
       if c <> 0 then c
       else
         let c = compare k1 k2 in
-        if c <> 0 then c else Path.compare p1 p2
+        if c <> 0 then c
+        else
+          let c = Path.compare p1 p2 in
+          if c <> 0 then c else Path.compare fp1 fp2
   end
-  let pp_kind_path fmt (kind, p) =
-    Format.fprintf fmt "%a (%s)" path_print p (string_of_kind kind)
-  let pp_elt fmt (kind, p) = pp_kind_path fmt (kind, p)
+  let pp_elt fmt (kind, p, full_path) =
+    Format.fprintf fmt "%a [%a] (%s)" path_print p path_print full_path
+      (string_of_kind kind)
 
   include Set.Make (T)
 end
@@ -236,17 +239,16 @@ let apply_substitutions_fixpoint t substs =
 let fill_queue (paths : Path_trie.t) queue =
   Path_trie.to_seq paths
   |> Seq.fold_left
-       (fun acc (path, kinds) ->
-         Kinds.fold
-           (fun kind acc ->
+       (fun acc (path, full_paths) ->
+         Discourse_types.Paths.fold
+           (fun (kind, full_path) acc ->
              match kind with
-             | Type ->
-               (* Format.eprintf "ADDING T %a TO Q\n%!" path_print path; *)
-               Priority_queue.add (Type, path) acc
-             | Module -> Priority_queue.add (Module, path) acc
-             | Module_type -> Priority_queue.add (Module_type, path) acc
+             | Type -> Priority_queue.add (Type, path, full_path) acc
+             | Module -> Priority_queue.add (Module, path, full_path) acc
+             | Module_type ->
+               Priority_queue.add (Module_type, path, full_path) acc
              | _ -> acc)
-           kinds acc)
+           full_paths acc)
        queue
 
 (* This function should be called before any attempt to [shorten] paths in an
@@ -276,19 +278,6 @@ let find_path_by_name env kind path =
   let lid = Untypeast.lident_of_path path in
   try Some (find_by_name env kind lid) with Not_found -> None
 
-let find_path env kind path =
-  try
-    let _ =
-      match kind with
-      | Type -> ignore (Env.find_type path env)
-      | Module -> ignore (Env.find_module_lazy path env)
-      | Module_type -> ignore (Env.find_modtype_lazy path env)
-    in
-    Some path
-  with Not_found -> find_path_by_name env kind path
-
-let check_path env kind path = Option.is_some @@ find_path env kind path
-
 let normalize env kind path =
   match kind with
   | Type -> fst (normalize_type_path env path)
@@ -301,25 +290,27 @@ let find_uid env kind path =
   | Module -> (Env.find_module_lazy path env).md_uid
   | Module_type -> (Env.find_modtype_lazy path env).mtd_uid
 
-let find_path_in_env env (kind, lid, path) =
+let find_path_by_name env kind apparent_path full_path =
   (* TODO it might be worth it to memoïze this function *)
-  match find_by_name env kind lid with
+  match find_path_by_name env kind apparent_path with
   (* TODO Env.find_type_by_name can raise Assertion_failure when the case Papply
      is reached in Env.lookup_type_path_full *)
-  | exception (Not_found | Assert_failure _) ->
+  | None | (exception Assert_failure _) ->
     log ~title:"find_path_in_env" "%s name not found: %a" (string_of_kind kind)
       Logger.fmt
-      (Fun.flip Pprintast.longident lid);
+      (Fun.flip path_print apparent_path);
     None
-  | path_in_env -> (
+  | Some path_in_env -> (
     log ~title:"find_path_in_env" "Lid: %a [%a] Path in env: %a" Logger.fmt
-      (Fun.flip Pprintast.longident lid)
-      Logger.fmt (Fun.flip path_print path) Logger.fmt
+      (Fun.flip path_print apparent_path)
+      Logger.fmt
+      (Fun.flip path_print full_path)
+      Logger.fmt
       (Fun.flip path_print path_in_env);
-    if Path.compare path path_in_env == 0 then Some path_in_env
+    if Path.compare full_path path_in_env == 0 then Some path_in_env
     else
       try
-        let path = normalize env kind path in
+        let path = normalize env kind full_path in
         let path' = normalize env kind path_in_env in
         log ~title:"find_path_in_env" "%a <>? %a" Logger.fmt
           (Fun.flip path_print path) Logger.fmt
@@ -336,15 +327,30 @@ let find_path_in_env env (kind, lid, path) =
         end
       with Not_found -> None)
 
+(* [full_path] is used to disambiguate when a lookup by name is required *)
+let find_path env kind ~full_path path =
+  try
+    let _ =
+      match kind with
+      | Type -> ignore (Env.find_type path env)
+      | Module -> ignore (Env.find_module_lazy path env)
+      | Module_type -> ignore (Env.find_modtype_lazy path env)
+    in
+    Some path
+  with Not_found -> find_path_by_name env kind path full_path
+
+let check_path env kind ~full_path path =
+  Option.is_some @@ find_path env kind ~full_path path
+
 let find_best_path env ~canon_path table target_kind =
   match Path.Tbl.find_opt table canon_path with
   | None -> None
   | Some paths ->
     Path_set.to_seq paths
-    |> Seq.find_map (fun (kind, path) ->
+    |> Seq.find_map (fun (kind, path, full_path) ->
         (* TODO we should probably have a kind*path map*)
         if kind <> target_kind then None
-        else if check_path env kind path then Some path
+        else if check_path env kind ~full_path path then Some path
         else None)
 
 let improve_path env ~canon_path table kind path =
@@ -363,7 +369,7 @@ let process_queue env state ~table ~canon_path target_kind best =
         improve_path env ~canon_path table target_kind best_path
       in
       (best_path, state)
-    | Seq.Cons ((kind, next_path), next) ->
+    | Seq.Cons (((_kind, next_path, _full_path) as item), next) ->
       let next_level = compare next_path < 0 in
       if next_level then
         begin match
@@ -378,10 +384,10 @@ let process_queue env state ~table ~canon_path target_kind best =
         | best_path ->
           log ~title:"fill_by_level" "Finished a level. Current best: %a"
             Logger.fmt (fun f -> Format.pp_print_option path_print f best_path);
-          add_lid_to_table state (kind, next_path) next best_path
+          add_lid_to_table state item next best_path
         end
-      else add_lid_to_table state (kind, next_path) next best_path
-  and add_lid_to_table state ((kind, path) as item) next best_path =
+      else add_lid_to_table state item next best_path
+  and add_lid_to_table state ((kind, path, full_path) as item) next best_path =
     log ~title:"fill_by_level" "Treating %a (%s)" Logger.fmt
       (Fun.flip path_print path) (string_of_kind kind);
     let state =
@@ -390,7 +396,7 @@ let process_queue env state ~table ~canon_path target_kind best =
            paths that cannot be looked-up in the environement directly. We can
            find by name instead. However we must then check that we did actually
            find the type we were looking (same ident) for and not an homonym. *)
-        find_path env kind path
+        find_path env kind ~full_path path
       in
       match is_valid_in_current_env with
       | Some path_in_env -> begin
@@ -399,7 +405,7 @@ let process_queue env state ~table ~canon_path target_kind best =
            cmi loading. TODO: we could try to isolate these cases were that
            happen, but even then it's unclear which Uid we would use to identity
            them. *)
-        let canonical_path = normalize env kind path_in_env in
+        let canonical_path = normalize env kind full_path in
         log ~title:"fill_by_level"
           "Updating table: %a -> { %a (%s) (in env: %a) }" Logger.fmt
           (fun fmt -> path_print fmt canonical_path)
@@ -436,14 +442,14 @@ let process_queue env state ~table ~canon_path target_kind best =
   in
   match (Priority_queue.min_elt_opt state.queue, best) with
   | None, _ -> (best, state)
-  | Some (_kind, shortest_path_in_queue), Some best'
+  | Some (_kind, shortest_path_in_queue, _), Some best'
     when compare_paths_weight shortest_path_in_queue best' > 0 ->
     (* There cannot be a better candidate in the queue *)
     log ~title:"process_queue" "No shorter paths in the queue. (> %a)"
       Logger.fmt
     @@ Fun.flip path_print shortest_path_in_queue;
     (best, state)
-  | Some (_kind, shortest_path_in_queue), best ->
+  | Some (_kind, shortest_path_in_queue, _), best ->
     let compare = compare_paths_weight shortest_path_in_queue in
     let seq = Priority_queue.to_seq state.queue in
     fill_by_level ~compare seq state best
@@ -511,9 +517,7 @@ let shorten ~env ~initial ~canon_path kind =
 
   log ~title:"shorten" "Initial: %a; Canon: %a; Current best: %a" Logger.fmt
     (Fun.flip path_print initial) Logger.fmt (Fun.flip path_print canon_path)
-    Logger.fmt (fun f ->
-      let best = Option.map (fun p -> (kind, p)) best in
-      Format.pp_print_option Path_set.pp_elt f best);
+    Logger.fmt (fun f -> Format.pp_print_option path_print f best);
 
   (* Is there a better one in the queue ? *)
   let best_path, { queue = queue'; not_in_env = not_in_env' } =

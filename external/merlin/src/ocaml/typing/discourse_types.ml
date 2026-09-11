@@ -86,36 +86,37 @@ end
 
 module Segment_map = Map.Make (Segment)
 
-(* TODO: rename to [Path_trie], along with its users. *)
 module Path_trie = struct
-  (* Paths are stored one segment per edge, so the position of a node in the
-     trie is the path it stands for; a node only records the kinds that path is
-     known under. [Kinds.empty] marks a node that is a mere prefix. A root is
-     such a node: it has no kinds and all its children are [Root] segments. *)
-  type t = Trie of Kinds.t * t Segment_map.t
+  (* A trie of path segments. The position of a node in the trie is the apparent
+     path it stands for (ie: without opened or substituted away prefixes). The
+     original paths are stored inside the leaf. *)
+  type t = Trie of Paths.t * t Segment_map.t
 
-  let pp_kinds fmt kinds =
+  let pp_kinds fmt paths =
     let pp_sep fmt () = Format.fprintf fmt ";@;" in
     Format.fprintf fmt "@[<1>[%a]@]"
-      (Format.pp_print_list ~pp_sep (fun fmt kind ->
-           Format.pp_print_string fmt (Shape.Sig_component_kind.to_string kind)))
-      (Kinds.elements kinds)
+      (Format.pp_print_list ~pp_sep (fun fmt (kind, full_path) ->
+           Format.fprintf fmt "%s: %a"
+             (Shape.Sig_component_kind.to_string kind)
+             (Format_doc.compat Path.print)
+             full_path))
+      (Paths.elements paths)
 
-  let rec pp fmt (Trie (kinds, tries)) =
-    Format.fprintf fmt "%a :> %a" pp_kinds kinds
+  let rec pp fmt (Trie (paths, tries)) =
+    Format.fprintf fmt "%a :> %a" pp_kinds paths
       (Format.pp_print_seq (fun fmt (segment, trie) ->
            Format.fprintf fmt "@[<v 2>%a: %a@]" Segment.print segment pp trie))
       (Segment_map.to_seq tries)
 
-  let node ?(children = Segment_map.empty) kinds = Trie (kinds, children)
+  let node ?(children = Segment_map.empty) paths = Trie (paths, children)
 
-  let empty = node Kinds.empty
+  let empty = node Paths.empty
 
   let is_empty (Trie (_, children)) = Segment_map.is_empty children
 
-  let trie_of_path ?children path kinds =
+  let trie_of_path ?children path paths =
     let s_node (segment : Segment.t) acc =
-      node ~children:(Segment_map.singleton segment acc) Kinds.empty
+      node ~children:(Segment_map.singleton segment acc) Paths.empty
     in
     let rec aux acc (path : Path.t) =
       match path with
@@ -124,18 +125,19 @@ module Path_trie = struct
       | Papply (path, arg) -> aux (s_node (Apply arg) acc) path
       | Pextra_ty (path, extra) -> aux (s_node (Extra extra) acc) path
     in
-    aux (node ?children kinds) path
+    aux (node ?children paths) path
 
   let rec union (Trie (k, m)) (Trie (k', m')) =
     Trie
-      ( Kinds.union k k',
+      ( Paths.union k k',
         Segment_map.union (fun _seg t t' -> Some (union t t')) m m' )
 
-  let singleton path kind = trie_of_path path (Kinds.singleton kind)
+  (* [full_path] defaults to [path]: a name that denotes itself. *)
+  let singleton ?full_path path kind =
+    let full_path = Option.value ~default:path full_path in
+    trie_of_path path (Paths.singleton (kind, full_path))
 
-  let add path kind t =
-    let t' = trie_of_path path (Kinds.singleton kind) in
-    union t t'
+  let add ?full_path path kind t = union t (singleton ?full_path path kind)
 
   (* Takes the paths rooted at [id] out of [t]. TODO: callers used to take by
      name, they now have to provide the ident itself. *)
@@ -182,7 +184,7 @@ module Path_trie = struct
           (fun segment t acc -> aux (extend path segment) t acc)
           tries seq
       in
-      if not (Kinds.is_empty kinds) then Seq.Cons ((path, kinds), seq)
+      if not (Paths.is_empty kinds) then Seq.Cons ((path, kinds), seq)
       else seq ()
     in
     fun () ->
@@ -195,7 +197,7 @@ module Path_trie = struct
       Segment_map.fold
         (fun _ t acc -> aux (1 + acc) t)
         tries
-        (Kinds.cardinal kinds + acc)
+        (Paths.cardinal kinds + acc)
     in
     aux 0 t
 

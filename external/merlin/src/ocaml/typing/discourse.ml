@@ -278,17 +278,24 @@ module U = struct
 
   let if_record_usage f = if record_usages then f ()
 
-  let define ~from kind ?root id =
+  (* [full_path] is the complete path in the environement. *)
+  let define ~from kind ?root ?full_path id =
     if_record_usage @@ fun () ->
     let path = path_of_ident ?root id in
-    log ~title:"U2" "U2: %s %a %s"
+    log ~title:"U2" "U2: %s %a%a %s"
       (Shape.Sig_component_kind.to_string kind)
       Logger.fmt
       (fun fmt -> (Format_doc.compat Path.print) fmt path)
+      Logger.fmt
+      (fun fmt ->
+        match full_path with
+        | None -> ()
+        | Some full_path ->
+          Format.fprintf fmt " [%a]" (Format_doc.compat Path.print) full_path)
       (match from with
       | `File -> "defined in current file"
       | `Open -> "brough in scope by an open");
-    g := { !g with discourse = Path_trie.add path kind !g.discourse }
+    g := { !g with discourse = Path_trie.add ?full_path path kind !g.discourse }
 
   let rec define_signature ?(from = `File) ?root sg =
     if record_usages then List.iter (define_component ~from ?root) sg
@@ -304,9 +311,11 @@ module U = struct
       | Sig_class (_, _, _, _) | Sig_class_type (_, _, _, _) ->
         (* TODO: do *) ()
 
-  and define_type ?(from = `File) ?root id = define ~from ?root Type id
+  and define_type ?(from = `File) ?root ?full_path id =
+    define ~from ?root ?full_path Type id
 
-  and define_value ?(from = `File) ?root id = define ~from ?root Value id
+  and define_value ?(from = `File) ?root ?full_path id =
+    define ~from ?root ?full_path Value id
 
   and define_module ?(from = `File) ?root (decl : Types.module_declaration) id =
     define ~from Module ?root id;
@@ -316,8 +325,8 @@ module U = struct
     | Mty_signature module_type -> define_signature ~from ~root module_type
     | _ -> ()
 
-  and define_modtype ?(from = `File) ?root id =
-    define ~from ?root Module_type id
+  and define_modtype ?(from = `File) ?root ?full_path id =
+    define ~from ?root ?full_path Module_type id
 
   (** {1 Rule U3}
 
@@ -328,7 +337,13 @@ module U = struct
   *)
 
   (* [open_path] is the path of the module being opened. [path_under_open] is
-     the current path relative to the path of the module being opened. *)
+     the current path relative to the path of the module being opened.
+
+     A component [x] is known under two paths: [path_under_open.x], the one the
+     user can write now that the module is opened (and the one we want to print)
+     and [open_path.x], the one valid in the current environement. We record the
+     pair, so that a candidate coming out of an [open] can still be checked
+     against an environment and filed under the right canonical path. *)
   let rec define_signature_for_open ~open_path ?path_under_open
       (sg : Subst.Lazy.signature) =
     List.iter
@@ -337,33 +352,36 @@ module U = struct
         | Sig_type (id, _, _, _) ->
           log ~title:"U3" "U3: type %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          define_type ~from:`Open ?root:path_under_open id
+          let full_path = path_of_ident ~root:open_path id in
+          define_type ~from:`Open ?root:path_under_open ~full_path id
         | Sig_value (id, _, _) ->
           log ~title:"U3" "U3: value %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          define_value ~from:`Open ?root:path_under_open id
+          let full_path = path_of_ident ~root:open_path id in
+          define_value ~from:`Open ?root:path_under_open ~full_path id
         | Sig_typext (_, _, _, _) | Sig_jkind _ -> ()
         | Sig_module (id, Mp_present, { md_type = Mty_signature s; _ }, _, _) ->
           (* We recursively  bring everything that is direcelty defined in the
              opened module, but without following aliases. *)
           log ~title:"U3" "U3: module (present) %a brought in scope by open"
             Logger.fmt (Fun.flip Ident.print id);
-          define ~from:`Open Module ?root:path_under_open id;
+          let full_path = path_of_ident ~root:open_path id in
+          define ~from:`Open Module ?root:path_under_open ~full_path id;
           let path_under_open = path_of_ident ?root:path_under_open id in
-          let open_path = path_of_ident ~root:open_path id in
-          add_subst_g open_path path_under_open;
-          define_signature_for_open ~open_path ~path_under_open s
+          add_subst_g full_path path_under_open;
+          define_signature_for_open ~open_path:full_path ~path_under_open s
         | Sig_module (id, _, { md_type; _ }, _, _) ->
           log ~title:"U3" "U3: module %a brought in scope by open" Logger.fmt
             (Fun.flip Ident.print id);
-          define ~from:`Open Module ?root:path_under_open id;
+          let full_path = path_of_ident ~root:open_path id in
+          define ~from:`Open Module ?root:path_under_open ~full_path id;
           let path_under_open = path_of_ident ?root:path_under_open id in
           let () =
             match md_type with
             | Mty_alias alias_path -> add_subst_g alias_path path_under_open
             | _ -> ()
           in
-          add_subst_g (path_of_ident ~root:open_path id) path_under_open
+          add_subst_g full_path path_under_open
           (* TODO Adding to U here fixes a few issues but we would prefer not to
              do it. *)
           (* g := *)
@@ -376,7 +394,8 @@ module U = struct
         | Sig_modtype (id, _, _) ->
           log ~title:"U3" "U3: module type %a brought in scope by open"
             Logger.fmt (Fun.flip Ident.print id);
-          define_modtype ~from:`Open ?root:path_under_open id
+          let full_path = path_of_ident ~root:open_path id in
+          define_modtype ~from:`Open ?root:path_under_open ~full_path id
         | Sig_class (_, _, _, _) | Sig_class_type (_, _, _, _) ->
           (* TODO: do *) ())
       (Subst.Lazy.force_signature_once sg)
@@ -556,6 +575,9 @@ module D = struct
       ({ paths; substs }, u_next)
     with Not_found -> ({ paths; substs }, u_next)
 
+  (* [apparent] is the path the module is reachable under, which may be shorter
+     than [path] when we got here by following an alias: the components we add
+     are named under it, but identified by their real path. *)
   let d3_rule env path paths substs sig_ =
     let pdot id = Path.Pdot (path, Ident.name id) in
     List.fold_left
@@ -642,7 +664,6 @@ module D = struct
               disambiguator = U.Disambiguate_id.get_id ()
             }
             u_next
-          (* add_path_to_discourse env { paths; substs } Module lid path'  *)
         in
 
         ((paths, substs), u_next)
@@ -702,7 +723,11 @@ module D = struct
     (* TODO: If item is already in paths we should skip adding it (and more
        importantly, skip the consequences!) *)
     let kind, path = item.item in
-    let d = { d with paths = Path_trie.add path kind d.paths } in
+    let d =
+      (* D2 records the item under the name it reached U with, identified by
+         its own path. *)
+      { d with paths = Path_trie.add path kind d.paths }
+    in
     (* In some cases, [consequences] tries to load its own compilation unit,
        which (inconsistently to our understanding) fails.
 
