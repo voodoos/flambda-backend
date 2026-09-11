@@ -55,7 +55,7 @@ Usage.ml
   $ cat > .merlin << 'EOF'
   > FLG -short-paths -nostdlib
   > B .
-  > B priv
+  > BH priv
   > EOF
 
 Expected: "M.A.t -> int".
