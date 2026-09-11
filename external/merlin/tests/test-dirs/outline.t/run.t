@@ -1224,7 +1224,7 @@
   "A.a"
   null
   $ $MERLIN single outline -short-paths < path.ml | jq '.value[].type'
-  "a"
+  "int"
   null
   $ $MERLIN single outline -filename foo.mli < foo.mli
   {
@@ -1852,7 +1852,7 @@
   "A.a"
   null
   $ $MERLIN single outline -short-paths < path.ml | jq '.value[].type'
-  "a"
+  "int"
   null
 
 Check that when we pass "-include-types false", every "type" is null.

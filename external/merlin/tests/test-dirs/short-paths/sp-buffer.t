@@ -21,11 +21,11 @@
   $ echo "FLG -short-paths" > .merlin
   $ $MERLIN single type-enclosing -position 7:8 \
   > -filename foo.ml < foo.ml | jq '.value[0].type'
-  "u"
+  "int"
 
   $ $MERLIN single type-enclosing -position 9:9 \
   > -filename foo.ml < foo.ml | jq '.value[0].type'
-  "u"
+  "int"
 
   $ $MERLIN single type-enclosing -position 13:5 -filename foo.ml < foo.ml 
   {

@@ -35,7 +35,7 @@ $ $MERLIN single dump -what parsetree -filename foo.ml < foo.ml
           "line": 8,
           "col": 14
         },
-        "type": "type t = Bar.t",
+        "type": "type t = Foo.t",
         "tail": "no"
       },
       {
@@ -47,7 +47,7 @@ $ $MERLIN single dump -what parsetree -filename foo.ml < foo.ml
           "line": 8,
           "col": 14
         },
-        "type": "Bar.t",
+        "type": "Foo.t",
         "tail": "no"
       },
       {
@@ -59,7 +59,7 @@ $ $MERLIN single dump -what parsetree -filename foo.ml < foo.ml
           "line": 8,
           "col": 14
         },
-        "type": "type u = Bar.t",
+        "type": "type u = Foo.t",
         "tail": "no"
       }
     ],
@@ -106,7 +106,7 @@ $ $MERLIN single dump -what parsetree -filename foo.ml < foo.ml
 
   $ $MERLIN single type-enclosing -position 3:4 \
   > -filename open.ml <open.ml | jq '.value[].type'
-  "a"
+  "int"
 
   $ cat >open.ml <<EOF
   > module A = struct type a = int end
@@ -116,7 +116,7 @@ $ $MERLIN single dump -what parsetree -filename foo.ml < foo.ml
 
   $ $MERLIN single type-enclosing -position 3:4 \
   > -filename open.ml <open.ml | jq '.value[].type'
-  "a"
+  "int"
 
 Open + Subst
 
