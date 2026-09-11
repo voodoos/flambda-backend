@@ -128,8 +128,8 @@ Dump the discourse so regressions show up as a diff in this test:
     Async!.Let_syntax.return ->
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
-    Deferred -> [Deferred];
-    Let_syntax -> [Let_syntax];
+    Async!.Deferred -> [Deferred];
+    Async!.Let_syntax -> [Let_syntax];
     Async_kernel__!.Deferred -> [Deferred];
     Async_kernel__Deferred!.Let_syntax.Let_syntax -> [Let_syntax] }
   # discourse-recap - next_U
@@ -243,10 +243,8 @@ Dump the discourse so regressions show up as a diff in this test:
     substs =
     [Async_kernel__Deferred! -> [Async!.Deferred; Async_kernel__!.Deferred];
     Async_kernel__Deferred0! -> [Async_kernel__!.Deferred0];
-    Deferred -> [Deferred];
-    Let_syntax -> [Let_syntax];
-    Async!.Deferred -> [Async_kernel__!.Deferred];
-    Async!.Let_syntax -> [Async!.Deferred.Let_syntax.Let_syntax];
+    Async!.Deferred -> [Deferred; Async_kernel__!.Deferred];
+    Async!.Let_syntax -> [Let_syntax; Async!.Deferred.Let_syntax.Let_syntax];
     Async_kernel__!.Deferred -> [Async_kernel__Deferred!; Deferred];
     Async_kernel__Deferred!.Let_syntax -> [Async!.Deferred.Let_syntax];
     Async_kernel__Deferred!.Let_syntax.Let_syntax ->
@@ -259,10 +257,8 @@ Dump the discourse so regressions show up as a diff in this test:
     substs =
     Async_kernel__Deferred! -> [Async!.Deferred; Async_kernel__!.Deferred];
     Async_kernel__Deferred0! -> [Async_kernel__!.Deferred0];
-    Deferred -> [Deferred];
-    Let_syntax -> [Let_syntax];
-    Async!.Deferred -> [Async_kernel__!.Deferred];
-    Async!.Let_syntax -> [Async!.Deferred.Let_syntax.Let_syntax];
+    Async!.Deferred -> [Deferred; Async_kernel__!.Deferred];
+    Async!.Let_syntax -> [Let_syntax; Async!.Deferred.Let_syntax.Let_syntax];
     Async_kernel__!.Deferred -> [Async_kernel__Deferred!; Deferred];
     Async_kernel__Deferred!.Let_syntax -> [Async!.Deferred.Let_syntax];
     Async_kernel__Deferred!.Let_syntax.Let_syntax ->
@@ -276,10 +272,8 @@ Dump the discourse so regressions show up as a diff in this test:
     substs =
     [Async_kernel__Deferred! -> [Async!.Deferred; Async_kernel__!.Deferred];
     Async_kernel__Deferred0! -> [Async_kernel__!.Deferred0];
-    Deferred -> [Deferred];
-    Let_syntax -> [Let_syntax];
-    Async!.Deferred -> [Async_kernel__!.Deferred];
-    Async!.Let_syntax -> [Async!.Deferred.Let_syntax.Let_syntax];
+    Async!.Deferred -> [Deferred; Async_kernel__!.Deferred];
+    Async!.Let_syntax -> [Let_syntax; Async!.Deferred.Let_syntax.Let_syntax];
     Async_kernel__!.Deferred -> [Async_kernel__Deferred!; Deferred];
     Async_kernel__Deferred!.Let_syntax -> [Async!.Deferred.Let_syntax];
     Async_kernel__Deferred!.Let_syntax.Let_syntax ->
