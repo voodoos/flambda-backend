@@ -49,7 +49,7 @@
   > let foo = Core.Error.return ()
   > EOF
 
-We expect Deferred.t 
+We expect Error.t 
   $ $MERLIN single type-enclosing -position 2:5 \
   > -filename main.ml <main.ml
   {
