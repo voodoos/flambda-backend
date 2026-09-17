@@ -554,7 +554,7 @@ let rec path_mask (path : Path.t) (lid : Longident.t) : Path.t =
     Hashtbl.add !path_masks_cache (lid, path) masked_path;
     masked_path
 
-let shorten ~env ~initial ~canon_path kind =
+let rec shorten ~env ~initial ~canon_path kind =
   let canon_path = canon_repr env kind canon_path in
   let discourse = Discourse.get () in
   let queue, table = (!priority_queue, !canon_table) in
@@ -603,7 +603,7 @@ let shorten ~env ~initial ~canon_path kind =
   priority_queue := queue';
   not_in_env := not_in_env';
 
-  Option.value ~default:initial best_path
+  Option.value ~default:initial best_path |> shorten_application_args env
 (* match best_path with
   | None ->
     log ~title:"shorten" "Falling-back on initial path %a" Logger.fmt
@@ -614,6 +614,24 @@ let shorten ~env ~initial ~canon_path kind =
         Format.fprintf fmt "Masking path %a with lid %a" path_print path
           Pprintast.longident lid);
     path_mask path lid *)
+
+and shorten_application_args env path =
+  match (path : Path.t) with
+  | Pident _ -> path
+  | Pdot (p, s) ->
+    let p' = shorten_application_args env p in
+    if p' == p then path else Pdot (p', s)
+  | Pextra_ty (p, extra) ->
+    let p' = shorten_application_args env p in
+    if p' == p then path else Pextra_ty (p', extra)
+  | Papply (p1, p2) ->
+    let p1' = find_module env p1 in
+    let p2' = find_module env p2 in
+    if p1' == p1 && p2' == p2 then path else Papply (p1', p2')
+
+and find_module env initial =
+  let canon_path = Env.normalize_module_path None env initial in
+  shorten ~env ~initial ~canon_path Module
 
 type type_result = Short_paths.type_result =
   | Nth of int
@@ -640,10 +658,6 @@ let find_type_simple env initial =
   let canon_path, _subst = normalize_type_path env initial in
   let short = shorten ~env ~initial ~canon_path Type in
   short
-
-let find_module env initial =
-  let canon_path = Env.normalize_module_path None env initial in
-  shorten ~env ~initial ~canon_path Module
 
 let find_module_type env initial =
   let canon_path = Env.normalize_modtype_path env initial in
