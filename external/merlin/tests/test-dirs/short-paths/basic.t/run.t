@@ -325,9 +325,12 @@
         "valid": true,
         "message": "Modules do not match: sig type t = int val foo : 'a -> string end
   is not included in S
-  Values do not match: val foo : 'a -> string is not included in val foo : t -> t
-  The type t -> string is not compatible with the type t -> t
-  Type string is not compatible with type t
+  Values do not match:
+  val foo : 'a -> string
+  is not included in
+  val foo : int -> int
+  The type int -> string is not compatible with the type int -> int
+  Type string is not compatible with type int
   File \"test.ml\", line 72, characters 2-20: Expected declaration
   File \"test.ml\", line 85, characters 8-11: Actual declaration"
       },

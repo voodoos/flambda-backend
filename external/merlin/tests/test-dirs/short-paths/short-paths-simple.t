@@ -12,7 +12,7 @@ Simple alias on string
   $ $MERLIN single type-enclosing -short-paths -position 2:5 -filename sample.ml < sample.ml \
   > | tr '\r\n' ' ' \
   > | jq .value[0].type -r
-  t -> t
+  string -> string
 
 Simple alias on string and ascription
 
@@ -28,7 +28,7 @@ Simple alias on string and ascription
   $ $MERLIN single type-enclosing -short-paths -position 2:5 -filename sample.ml < sample.ml \
   > | tr '\r\n' ' ' \
   > | jq .value[0].type -r
-  t -> t
+  string -> string
 
 Simple alias on string and int
 

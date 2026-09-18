@@ -21,5 +21,5 @@
 
 Domain should not be prefixed
   $ $MERLIN single type-enclosing -short-paths -position 12:4 \
-  > -filename import0.ml <import0.ml | tr '\n' ' ' | jq '.value[0].type' | head -c 30
-  "sig   type 'a t = 'a Domain.t
+  > -filename import0.ml <import0.ml | tr '\n' ' ' | jq '.value[0].type' | head -c 32
+  "sig   type 'a t = 'a Domain/2.t
