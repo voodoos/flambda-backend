@@ -116,6 +116,7 @@
   unit_info
   current_unit
   shape
+  discourse_types
   shape_reduce
   allowance
   solver_intf
@@ -329,6 +330,8 @@
 (copy_files ../../parsing/unit_info.ml)
 
 (copy_files ../../typing/shape.ml)
+
+(copy_files ../../typing/discourse_types.ml)
 
 (copy_files ../../typing/allowance.ml)
 
@@ -753,6 +756,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Discourse_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
@@ -888,6 +892,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Discourse_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx

@@ -613,6 +613,7 @@ let cstr id args =
     cd_loc = Location.none;
     cd_attributes = [];
     cd_uid = Uid.of_predef_id id;
+    cd_discourse = Discourse_types.empty;
   }
 
 let list_jkind param =
@@ -688,6 +689,7 @@ let decl_of_type_constr type_constr =
       type_attributes = [];
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version type_uid;
+      type_discourse = Discourse_types.empty;
       type_unboxed_version = None;
     }
   in
@@ -720,6 +722,7 @@ let decl_of_type_constr type_constr =
      type_attributes = [];
      type_unboxed_default = false;
      type_uid;
+     type_discourse = Discourse_types.empty;
      type_unboxed_version;
     }
   in

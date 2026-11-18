@@ -3839,6 +3839,7 @@ let dummy =
     type_attributes = [];
     type_unboxed_default = false;
     type_uid = Uid.internal_not_actually_unique;
+    type_discourse = Discourse_types.empty;
     type_unboxed_version = None;
   }
 

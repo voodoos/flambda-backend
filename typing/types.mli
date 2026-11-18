@@ -881,6 +881,7 @@ type type_declaration =
        ([@@unboxed] or [@@represent_as_float_array]), so the representation may
        have been chosen by a compiler flag. *)
     type_uid: Uid.t;
+    type_discourse: Discourse_types.t;
     type_unboxed_version : type_declaration option;
     (* stores the unboxed version of that this type introduces: this is [Some]
        for predefined types with unboxed versions (e.g. [float]) and boxed
@@ -1073,6 +1074,7 @@ and constructor_declaration =
     cd_loc: Location.t;
     cd_attributes: Parsetree.attributes;
     cd_uid: Uid.t;
+    cd_discourse: Discourse_types.t;
   }
 
 and constructor_argument =
@@ -1128,6 +1130,7 @@ type class_declaration =
     cty_loc: Location.t;
     cty_attributes: Parsetree.attributes;
     cty_uid: Uid.t;
+    cty_discourse: Discourse_types.t;
   }
 
 type class_type_declaration =
@@ -1139,6 +1142,7 @@ type class_type_declaration =
     clty_loc: Location.t;
     clty_attributes: Parsetree.attributes;
     clty_uid: Uid.t;
+    clty_discourse: Discourse_types.t;
   }
 
 (* Type expressions for the module language *)
@@ -1237,6 +1241,7 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_discourse: Discourse_types.t;
     }
 
   type module_type =
@@ -1276,6 +1281,15 @@ module type Wrapped = sig
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
+    md_discourse: Discourse_types.t;
+    (** [md_discourse] stores the user written paths used in the description of
+      the module. They will be added to the Discourse if the module is used.  *)
+    md_discourse_alias: (Longident.t loc * Discourse_types.Item.t) option;
+    (** If the user wrote a module alias [module Foo = Bar] with no signature
+        then [md_discourse_alias] is the path [Bar]. When Foo is used, this path
+        is added to the set of Used paths, not directly into the Discourse.
+        When the user wrote module M = P.Q both items of Q and P should be
+        considered part of the domain of discourse, not only Q.  *)
   }
 
   and modtype_declaration =
@@ -1284,6 +1298,7 @@ module type Wrapped = sig
     mtd_attributes: Parsetree.attributes;
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
+    mtd_discourse: Discourse_types.t;
   }
 
   (* Returns [None] for items that have no runtime representation (see

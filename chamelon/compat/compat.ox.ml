@@ -539,6 +539,7 @@ let mk_constructor_description cstr_name =
     cstr_attributes = [];
     cstr_inlined = None;
     cstr_uid = Uid.internal_not_actually_unique;
+    cstr_discourse = Discourse_types.empty;
     cstr_repr = Variant_boxed [||];
     cstr_constant = true
   }
@@ -562,6 +563,7 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_modalities = Mode.Modality.(Const.id |> of_const);
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
+    val_discourse = Discourse_types.empty;
     val_zero_alloc = Zero_alloc.default;
     val_lpoly = Lpoly.determined []
   }

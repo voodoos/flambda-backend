@@ -245,6 +245,7 @@
   scalar
   primitive
   shape
+  discourse_types
   shape_reduce
   zero_alloc
   types
