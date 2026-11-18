@@ -151,6 +151,8 @@ let reinit () =
   then reinit_level := !currentstamp
   else currentstamp := !reinit_level
 
+let get_currentstamp () = !currentstamp
+
 let is_global = function
   | Global _ -> true
   | Global_with_args _ -> true

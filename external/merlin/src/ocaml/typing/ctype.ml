@@ -1710,6 +1710,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_attributes = [];
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+    type_discourse = Discourse_types.empty;
     type_unboxed_version = None;
   }
 
@@ -8721,6 +8722,10 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_attributes = decl.type_attributes;
       type_unboxed_default = decl.type_unboxed_default;
       type_uid = decl.type_uid;
+      type_discourse =
+        { decl.type_discourse with local = Discourse_types.filter
+          (fun (_, path) -> not (Path.exists_free mid path))
+          decl.type_discourse.local };
       type_unboxed_version;
     }
   with Nondep_cannot_erase _ as exn ->
@@ -8805,6 +8810,7 @@ let nondep_class_declaration env ids decl =
       cty_loc = decl.cty_loc;
       cty_attributes = decl.cty_attributes;
       cty_uid = decl.cty_uid;
+      cty_discourse = Discourse_types.empty;
     }
   in
   clear_hash ();
@@ -8821,6 +8827,7 @@ let nondep_cltype_declaration env ids decl =
       clty_loc = decl.clty_loc;
       clty_attributes = decl.clty_attributes;
       clty_uid = decl.clty_uid;
+      clty_discourse = Discourse_types.empty;
     }
   in
   clear_hash ();

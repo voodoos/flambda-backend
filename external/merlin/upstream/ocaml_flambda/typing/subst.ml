@@ -432,6 +432,48 @@ let rec type_path s path =
            Pextra_ty (type_path s p, extra)
          | Pext_ty -> Pextra_ty (value_path s p, extra)
 
+(* Substitutions of the paths stored in the discourse of a declaration. These
+   never fail: an item that cannot be substituted is dropped. *)
+
+let rec type_path_opt s path =
+  match Path.Map.find path s.types with
+  | Path p -> Some p
+  | Type_function _ ->
+      (* A type substituted by a type function has no path anymore *)
+      None
+  | exception Not_found ->
+     match path with
+     | Pident _ | Pdot _ -> Some (type_path s path)
+     | Papply _ | Pextra_ty (_, Pext_ty) -> None
+     | Pextra_ty (p, (Pcstr_ty _ | Punboxed_ty as extra)) ->
+         Option.map (fun p -> Pextra_ty (p, extra)) (type_path_opt s p)
+
+let discourse_item s (kind, path) =
+  match (kind : Shape.Sig_component_kind.t) with
+  | Type -> Option.map (fun path -> (kind, path)) (type_path_opt s path)
+  | Value | Extension_constructor | Class | Class_type ->
+      begin match path with
+      | Pident _ | Pdot _ -> Some (kind, value_path s path)
+      | Papply _ | Pextra_ty _ -> None
+      end
+  | Module -> Some (kind, module_path s path)
+  | Module_type ->
+      begin try Some (kind, modtype_path s path) with
+      | Module_type_path_substituted_away _ -> None
+      end
+  | Constructor | Label | Unboxed_label | Jkind -> Some (kind, path)
+
+let discourse s (d : Discourse_types.t) =
+  if Array.length d.local = 0 then d
+  else { d with local = Discourse_types.filter_map (discourse_item s) d.local }
+
+let discourse_alias s = function
+  | None -> None
+  | Some (lid, item) ->
+      (* TODO CR Ulysse it seems that the longident is not actually required, we
+         should remove it. This will simplify this case. *)
+      Option.map (fun item -> (lid, item)) (discourse_item s item)
+
 let to_subst_by_type_function s p =
   match Path.Map.find p s.types with
   | Path _ -> false
@@ -876,6 +918,7 @@ let constructor_declaration copy_scope s c =
     cd_loc = loc s c.cd_loc;
     cd_attributes = attrs s c.cd_attributes;
     cd_uid = c.cd_uid;
+    cd_discourse = discourse s c.cd_discourse;
   }
 
 let unsafe_mode_crossing copy_scope s loc
@@ -964,6 +1007,7 @@ let rec type_declaration' copy_scope s decl =
     type_attributes = attrs s decl.type_attributes;
     type_unboxed_default = decl.type_unboxed_default;
     type_uid = decl.type_uid;
+    type_discourse = discourse s decl.type_discourse;
     type_unboxed_version =
       Option.map (type_declaration' copy_scope s) decl.type_unboxed_version;
   }
@@ -1010,6 +1054,7 @@ let class_declaration' copy_scope s decl =
     cty_loc = loc s decl.cty_loc;
     cty_attributes = attrs s decl.cty_attributes;
     cty_uid = decl.cty_uid;
+    cty_discourse = discourse s decl.cty_discourse;
   }
 
 let class_declaration s decl =
@@ -1024,6 +1069,7 @@ let cltype_declaration' copy_scope s decl =
     clty_loc = loc s decl.clty_loc;
     clty_attributes = attrs s decl.clty_attributes;
     clty_uid = decl.clty_uid;
+    clty_discourse = discourse s decl.clty_discourse;
   }
 
 let cltype_declaration s decl =
@@ -1214,6 +1260,7 @@ let to_lazy =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_discourse = vd.val_discourse;
     }
   in
   To_lazy.{map_signature; map_type_expr; map_value_description}
@@ -1262,6 +1309,7 @@ let rec subst_lazy_value_description s descr =
       | _ -> descr.val_zero_alloc);
     val_attributes = attrs s descr.val_attributes;
     val_uid = descr.val_uid;
+    val_discourse = discourse s descr.val_discourse;
   }
 
 and subst_lazy_module_decl scoping s md =
@@ -1276,7 +1324,9 @@ and subst_lazy_module_decl scoping s md =
     md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
-    md_uid = md.md_uid }
+    md_uid = md.md_uid;
+    md_discourse = discourse s md.md_discourse;
+    md_discourse_alias = discourse_alias s md.md_discourse_alias }
 
 and subst_lazy_modtype scoping s = function
   | Mty_ident p ->
@@ -1313,7 +1363,8 @@ and subst_lazy_modtype_decl scoping s mtd =
   { mtd_type = Option.map (subst_lazy_modtype scoping s) mtd.mtd_type;
     mtd_attributes = attrs s mtd.mtd_attributes;
     mtd_loc = loc s mtd.mtd_loc;
-    mtd_uid = mtd.mtd_uid }
+    mtd_uid = mtd.mtd_uid;
+    mtd_discourse = discourse s mtd.mtd_discourse }
 
 and subst_lazy_signature scoping s sg =
   Wrap.substitute ~compose scoping s sg
@@ -1416,6 +1467,7 @@ and from_lazy =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_discourse = vd.val_discourse;
     }
   in
   From_lazy.{map_signature; map_type_expr; map_value_description}

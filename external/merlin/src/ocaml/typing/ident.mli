@@ -87,6 +87,8 @@ val to_global_exn: t -> Global_module.Name.t
 
 val reinit: unit -> unit
 
+val get_currentstamp: unit -> int
+
 type 'a tbl
 (** ['a tbl] represents association tables from identifiers to values
    of type ['a].

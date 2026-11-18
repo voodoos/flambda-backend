@@ -474,6 +474,7 @@ type type_declaration =
     type_attributes: Parsetree.attributes;
     type_unboxed_default: bool;
     type_uid: Uid.t;
+    type_discourse: Discourse_types.t;
     type_unboxed_version : type_declaration option;
  }
 
@@ -585,6 +586,7 @@ and constructor_declaration =
     cd_loc: Location.t;
     cd_attributes: Parsetree.attributes;
     cd_uid: Uid.t;
+    cd_discourse: Discourse_types.t;
   }
 
 and constructor_argument =
@@ -637,6 +639,7 @@ type class_declaration =
     cty_loc: Location.t;
     cty_attributes: Parsetree.attributes;
     cty_uid: Uid.t;
+    cty_discourse: Discourse_types.t;
  }
 
 type class_type_declaration =
@@ -648,6 +651,7 @@ type class_type_declaration =
     clty_loc: Location.t;
     clty_attributes: Parsetree.attributes;
     clty_uid: Uid.t;
+    clty_discourse: Discourse_types.t;
   }
 
 (* Type expressions for the module language *)
@@ -718,6 +722,7 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_discourse: Discourse_types.t;
     }
 
   type module_type =
@@ -755,6 +760,8 @@ module type Wrapped = sig
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
+    md_discourse: Discourse_types.t;
+    md_discourse_alias: (Longident.t loc * Discourse_types.Item.t) option;
   }
 
   and modtype_declaration =
@@ -763,6 +770,7 @@ module type Wrapped = sig
     mtd_attributes: Parsetree.attributes;
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
+    mtd_discourse: Discourse_types.t;
   }
 
   val sort_of_signature_item :
@@ -828,21 +836,25 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
   let value_description m vd = m.map_value_description m vd
 
   let module_declaration m {md_type; md_modalities; md_attributes;
-    md_loc; md_uid} =
+    md_loc; md_uid; md_discourse; md_discourse_alias} =
     To.{
       md_type = module_type m md_type;
       md_modalities;
       md_attributes;
       md_loc;
       md_uid;
+      md_discourse;
+      md_discourse_alias;
     }
 
-  let modtype_declaration m {mtd_type; mtd_attributes; mtd_loc; mtd_uid} =
+  let modtype_declaration m
+      {mtd_type; mtd_attributes; mtd_loc; mtd_uid; mtd_discourse} =
     To.{
       mtd_type = Option.map (module_type m) mtd_type;
       mtd_attributes;
       mtd_loc;
       mtd_uid;
+      mtd_discourse;
     }
 
   let signature_item m = function

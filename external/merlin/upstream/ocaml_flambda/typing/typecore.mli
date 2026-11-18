@@ -425,8 +425,14 @@ val report_error: loc:Location.t -> Env.t -> error -> Location.error
  (** @deprecated.  Use {!Location.error_of_exn}, {!Location.print_report}. *)
 
 (* Forward declaration, to be filled in by Typemod.type_module *)
+type module_discourse = {
+  paths : Discourse_types.t;
+  alias : (Longident.t Asttypes.loc * Discourse_types.Item.t) option;
+}
+
 val type_module:
-  (Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t) ref
+  (Env.t -> Parsetree.module_expr ->
+    Typedtree.module_expr * Shape.t * module_discourse) ref
 (* Forward declaration, to be filled in by Typemod.type_open *)
 val type_open:
   (?used_slot:bool ref -> override_flag -> Env.t -> Location.t ->
