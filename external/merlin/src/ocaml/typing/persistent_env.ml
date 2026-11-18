@@ -927,7 +927,9 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
     }
   in
   Hashtbl.add persistent_structures modname ps;
-  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
+  (* Only the legacy implementation of short-paths uses the basis *)
+  if !Clflags.legacy_short_path then
+    register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
   begin match binding with
   | Runtime_parameter id -> Ident.Tbl.add locals_bound_to_runtime_parameters id ()
   | Constant _ -> ()

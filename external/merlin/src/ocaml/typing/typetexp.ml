@@ -979,7 +979,8 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
              ctyp_env = env;
              ctyp_loc = styp.ptyp_loc;
              ctyp_attributes = [];
-           }
+           },
+           Discourse_types.empty
     )
 
 and transl_type_aux env ~row_context ~aliased ~policy mode styp =
@@ -1088,6 +1089,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let discourse =
         Discourse_types.singleton (Sig_component_kind.Type, path)
       in
+      Discourse.use_type env lid path;
       let stl =
         match stl with
         | [ {ptyp_desc=Ptyp_any None} as t ] when decl.type_arity > 1 ->

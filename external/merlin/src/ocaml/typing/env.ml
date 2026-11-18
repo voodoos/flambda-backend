@@ -2370,12 +2370,15 @@ let prefix_idents root prefixing_sub sg =
 
 (* Short path additions *)
 
+let no_short_paths_additions () =
+  !Clflags.real_paths || not !Clflags.legacy_short_path
+
 let short_paths_type ~long_path predef id decl old =
-  if long_path || (not predef && !Clflags.real_paths) then old
+  if long_path || (not predef && no_short_paths_additions ()) then old
   else Type(id, decl) :: old
 
 let short_paths_type_open path decls old =
-  if !Clflags.real_paths then old
+  if no_short_paths_additions () then old
   else Type_open(path, decls) :: old
 
 let unbound_class = Path.Pident (Ident.create_local "*undef*")
@@ -2384,29 +2387,29 @@ let is_dummy_class decl =
   Path.same decl.clty_path unbound_class
 
 let short_paths_class_type id decl old =
-  if !Clflags.real_paths || is_dummy_class decl then old
+  if no_short_paths_additions () || is_dummy_class decl then old
   else Class_type(id, decl) :: old
 
 let short_paths_class_type_open path decls old =
+  if no_short_paths_additions () then old else
   let decls = NameMap.map (fun cltda -> cltda.cltda_declaration) decls in
-  if !Clflags.real_paths then old
-  else Class_type_open(path, decls) :: old
+  Class_type_open(path, decls) :: old
 
 let short_paths_module_type id decl old =
-  if !Clflags.real_paths then old
+  if no_short_paths_additions () then old
   else Module_type(id, decl) :: old
 
 let short_paths_module_type_open path decls old =
+  if no_short_paths_additions () then old else
   let decls = NameMap.map (fun mtda -> mtda.mtda_declaration) decls in
-  if !Clflags.real_paths then old
-  else Module_type_open(path, decls) :: old
+  Module_type_open(path, decls) :: old
 
 let short_paths_module id decl comps old =
-  if !Clflags.real_paths then old
+  if no_short_paths_additions () then old
   else Module(id, decl, comps) :: old
 
 let short_paths_module_open path comps old =
-  if !Clflags.real_paths then old
+  if no_short_paths_additions () then old
   else Module_open(path, comps) :: old
 
 (* Compute structure descriptions *)
@@ -3193,9 +3196,9 @@ let enter_value ?check ~mode name desc env =
   in
   (id, env)
 
-let enter_type ?(long_path = false) ~scope name info env =
+let enter_type ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-  let env = store_type ~check:true ~predef:false ~long_path ~hidden:false
+  let env = store_type ~check:true ~predef:false ~long_path:false ~hidden:false
     id info (Shape.leaf info.type_uid) env
   in
   (id, env)
@@ -3520,9 +3523,6 @@ let initial () =
       empty
   in
   initial_env
-
-let add_type_long_path ~check ?shape id info env =
-  add_type ~check ?shape ~predef:false ~long_path:true id info env
 
 let add_type ~check ?shape id info env =
   add_type ~check ?shape ~predef:false ~long_path:false id info env
@@ -6019,6 +6019,7 @@ let () =
   short_paths_module_components_desc' := short_paths_module_components_desc
 
 let update_short_paths env =
+  if not !Clflags.legacy_short_path then env else
   let env, short_paths =
     match env.short_paths with
     | None ->

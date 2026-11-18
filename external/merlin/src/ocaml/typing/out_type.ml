@@ -745,12 +745,19 @@ let wrap_mutation f =
 
 let wrap_printing_env ~reset_names env f =
   let old_env = !printing_env in
+  Shorter_paths.restore_ignored_paths None;
   set_printing_env (Env.update_short_paths env);
   if reset_names then reset_naming_context ();
-  try_finally f ~always:(fun () -> set_printing_env old_env)
+  try_finally f ~always:(fun () ->
+    Shorter_paths.restore_ignored_paths None;
+    set_printing_env old_env)
 
 let wrap_printing_env ?(error = false) env f =
-  if error then Env.without_cmis (wrap_printing_env ~reset_names:true env) f
+  (* The discourse-based implementation of short-paths looks names up in the
+     environment, which might load cmis. Only the legacy implementation runs
+     without cmis when printing errors. *)
+  if error && !Clflags.legacy_short_path then
+    Env.without_cmis (wrap_printing_env ~reset_names:true env) f
   else wrap_printing_env ~reset_names:true env f
 
 and wrap_printing_env_unguarded env f =
@@ -866,11 +873,11 @@ let best_type_path_original p =
     (* Format.eprintf "%a = %a -> %a@." path p path p' path p''; *)
     (p'', s)
 
-type type_result = Short_paths.type_result =
+type type_result = Shorter_paths.type_result =
   | Nth of int
   | Path of int list option * Path.t
 
-type type_resolution = Short_paths.type_resolution =
+type type_resolution = Shorter_paths.type_resolution =
   | Nth of int
   | Subst of int list
   | Id
@@ -889,37 +896,51 @@ let apply_nth n args =
 let best_type_path p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then Path(None, p)
-  else Short_paths.find_type (Env.short_paths !printing_env) p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_type (Env.short_paths !printing_env) p
+  else Shorter_paths.find_type !printing_env p
 
 let best_type_path_resolution p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then Id
-  else Short_paths.find_type_resolution (Env.short_paths !printing_env) p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_type_resolution (Env.short_paths !printing_env) p
+  else Shorter_paths.find_type_resolution !printing_env p
 
 let best_type_path_simple p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then p
-  else Short_paths.find_type_simple (Env.short_paths !printing_env) p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_type_simple (Env.short_paths !printing_env) p
+  else Shorter_paths.find_type_simple !printing_env p
 
 let best_module_type_path p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then p
-  else Short_paths.find_module_type (Env.short_paths !printing_env) p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_module_type (Env.short_paths !printing_env) p
+  else Shorter_paths.find_module_type !printing_env p
 
 let best_module_path p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then p
-  else Short_paths.find_module (Env.short_paths !printing_env) p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_module (Env.short_paths !printing_env) p
+  else Shorter_paths.find_module !printing_env p
 
 let best_class_type_path p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then None, p
-  else Short_paths.find_class_type (Env.short_paths !printing_env) p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_class_type (Env.short_paths !printing_env) p
+  else None, p (* TODO SP Ulysse *)
 
 let best_class_type_path_simple p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then p
-  else Short_paths.find_class_type_simple (Env.short_paths !printing_env) p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_class_type_simple (Env.short_paths !printing_env) p
+  else p (* TODO SP Ulysse *)
 
 (* When building a tree for a best type path, we should not disambiguate
    identifiers whenever the short-path algorithm detected a better path than
@@ -4016,7 +4037,11 @@ let with_hidden_items ids f =
 
 
 let add_sigitem env x =
-  Env.add_signature (Signature_group.flatten x) env
+  let sg = Signature_group.flatten x in
+  let env = Env.add_signature sg env in
+  if not (!Clflags.real_paths || !Clflags.legacy_short_path) then
+    Discourse.printed_signature env sg;
+  env
 
 let expand_module_type =
   ref ((fun _env _mty -> assert false) :
@@ -4186,19 +4211,32 @@ and trees_of_recursive_sigitem_group ?abbrev env
   in
   let env = Env.add_signature syntactic_group.pre_ghosts env in
   match syntactic_group.group with
-  | Not_rec x -> add_sigitem env x, [display x]
+  (* We have to print the item before adding them to the environment *)
+  | Not_rec x ->
+      let trees = [display x] in
+      add_sigitem env x, trees
   | Rec_group items ->
       let ids = List.map (fun x -> ident_sigitem x.Signature_group.src) items in
-      List.fold_left add_sigitem env items,
-      with_hidden_items ids (fun () -> List.map display items)
+      let trees = with_hidden_items ids (fun () -> List.map display items) in
+      List.fold_left add_sigitem env items, trees
 
 and tree_of_sigitem ?abbrev = function
   | Sig_value(id, decl, _) ->
       tree_of_value_description id decl
   | Sig_type(id, decl, rs, _) ->
-      tree_of_type_declaration id decl rs
+      (* TODO SP Ulysse this is not a very satisfing fix to the environement
+         issue. We do it because for performance reasons we put away names that
+         are not available when printing a path. We add them back to the list of
+         candidates when the printing environmeent changes. But when printing
+         signatures the idens in scope change too, so we add  them back here
+         too. *)
+      let tree = tree_of_type_declaration id decl rs in
+      Shorter_paths.restore_ignored_paths (Some id);
+      tree
   | Sig_typext(id, ext, es, _) ->
-      tree_of_extension_constructor id ext es
+      let tree = tree_of_extension_constructor id ext es in
+      Shorter_paths.restore_ignored_paths (Some id);
+      tree
   | Sig_module(id, _, md, rs, _) ->
       let abbrev =
         if List.exists (function
@@ -4209,9 +4247,13 @@ and tree_of_sigitem ?abbrev = function
           then Some (Abbrev.ellipsis ())
           else abbrev
       in
-      tree_of_module ?abbrev id md rs
+      let tree = tree_of_module ?abbrev id md rs in
+      Shorter_paths.restore_ignored_paths (Some id);
+      tree
   | Sig_modtype(id, decl, _) ->
-      tree_of_modtype_declaration ?abbrev id decl
+      let tree = tree_of_modtype_declaration ?abbrev id decl in
+      Shorter_paths.restore_ignored_paths (Some id);
+      tree
   | Sig_class(id, decl, rs, _) ->
       tree_of_class_declaration id decl rs
   | Sig_class_type(id, decl, rs, _) ->

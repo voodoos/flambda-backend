@@ -332,10 +332,16 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
 (* Compute the environment after opening a module *)
 
 let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
-  Env.open_signature ~loc ~used_slot ~toplevel ovf lid env
+  let (path, _, _) as res =
+    Env.open_signature ~loc ~used_slot ~toplevel ovf lid env
+  in
+  Discourse.use_module env lid path;
+  Discourse.open_module env path;
+  res
 
 let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let env = Lazy.force Env.initial in
+  Discourse.add_initial_discourse ();
   let open_module env m =
     let open Asttypes in
     let lid = {loc; txt = Longident.parse m } in
@@ -2090,6 +2096,7 @@ and transl_modtype_aux env smty =
   match smty.pmty_desc with
     Pmty_ident lid ->
       let path = transl_modtype_longident loc env lid.txt in
+      Discourse.use_modtype env lid path;
       mkmty (Tmty_ident (path, lid)) (Mty_ident path) env loc
         smty.pmty_attributes,
       md_discourse @@
@@ -2098,6 +2105,7 @@ and transl_modtype_aux env smty =
       let path = transl_module_alias loc env lid.txt in
       let discourse_item = (Sig_component_kind.Module, path) in
       let alias = lid, discourse_item in
+      Discourse.use_module env lid path;
       mkmty (Tmty_alias (path, lid)) (Mty_alias path) env loc
         smty.pmty_attributes,
       md_discourse ~alias @@ Discourse_types.singleton discourse_item
@@ -2181,6 +2189,7 @@ and transl_modtype_aux env smty =
       in
       (* Strengthening by a module path is recorded like a [with module]
          constraint. *)
+      Discourse.use_module env mod_id path;
       let discourse =
         md_discourse @@
         Discourse_types.add (Sig_component_kind.Module, path) discourse.paths
@@ -2220,6 +2229,7 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg, discourse) constr =
     | Pwith_module (l, l')
     | Pwith_modsubst (l,l') ->
         let path, md, _ = Env.lookup_module ~loc l'.txt env in
+        Discourse.use_module env l' path;
         let constr = if destructive then
             (Twith_modsubst (path, l'))
           else
@@ -2331,6 +2341,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
         apply_modalities_signature ~recursive env modalities.moda_modalities sg
     in
     let sg, newenv = Env.enter_signature ~scope sg ~mode:md_mode env in
+    let () = Discourse.define_signature newenv sg in
     Signature_group.iter
       (Signature_names.check_sig_item names loc)
       sg;
@@ -2367,6 +2378,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
         in
         List.iter (fun td ->
           Signature_names.check_type names td.typ_loc td.typ_id;
+          Discourse.define_type newenv td.typ_name td.typ_id;
         ) decls;
         let newenv = Env.update_short_paths newenv in
         let sig_items =
@@ -2468,6 +2480,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
                 ~mode:md_mode env
             in
             let newenv = Env.update_short_paths newenv in
+            Discourse.define_module newenv { pmd.pmd_name with txt = name } id;
             Signature_names.check_module names pmd.pmd_name.loc id;
             Some id, newenv
         in
@@ -2545,6 +2558,9 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
         in
         List.iter (fun (id, md, _uid) ->
           Signature_names.check_module names md.md_loc id;
+          Option.iter (fun txt ->
+              Discourse.define_module newenv { md.md_name with txt } id)
+            md.md_name.txt
         ) decls;
         let sig_items =
           map_rec (fun rs (id, md, uid) ->
@@ -2701,6 +2717,7 @@ and transl_modtype_decl_aux env
   in
   let scope = Ctype.create_scope () in
   let (id, newenv) = Env.enter_modtype ~scope pmtd_name.txt decl env in
+  Discourse.define_modtype newenv pmtd_name id;
   let mtd =
     {
      mtd_id=id;
@@ -3310,7 +3327,8 @@ and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
       mod_env = env;
       mod_attributes = Msupport.flush_saved_types () @ smod.pmod_attributes;
       mod_loc = smod.pmod_loc },
-      Shape.dummy_mod
+      Shape.dummy_mod,
+      empty_md_discourse
 
 and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
     smod =
@@ -3441,33 +3459,31 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         type_module_maybe_hold_locks ~alias ~hold_locks ~strengthen:true
           ~funct_body anchor env sarg
       in
-<<<<<<< Merlin:new-short-paths
       begin try
-      let md, final_shape =
-||||||| Compiler:last-imported
-      let md, final_shape =
-=======
       let md, final_shape, discourse =
->>>>>>> Compiler:HEAD
         match smty with
         | None ->
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
             Value.submode_err (sarg.pmod_loc, Module) arg_mode mode.mode_modes;
             { arg with
               mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
-<<<<<<< Merlin:new-short-paths
-            arg_shape
+            arg_shape,
+            arg_discourse
           | Some smty ->
-              let mty = transl_modtype env smty in
-              wrap_constraint_with_shape ~self_check:false env true arg
-                mty.mty_type mode.mode_modes arg_shape
-                (Tmodtype_explicit (mty, mode))
+              let mty, discourse = transl_modtype env smty in
+              let md, final_shape =
+                wrap_constraint_with_shape ~self_check:false env true arg
+                  mty.mty_type mode.mode_modes arg_shape
+                  (Tmodtype_explicit (mty, mode))
+              in
+              md, final_shape, md_discourse_union arg_discourse discourse
         in
         { md with
           mod_loc = smod.pmod_loc;
           mod_attributes = smod.pmod_attributes;
         },
-        final_shape
+        final_shape,
+        discourse
       with exn ->
        (* [merlin] For better Construct error messages we need to keep holes
           in the recovered typedtree *)
@@ -3482,41 +3498,10 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
               mod_env = env;
               mod_attributes = sarg.pmod_attributes;
             },
-            Shape.dummy_mod
+            Shape.dummy_mod,
+            empty_md_discourse
         | _ -> raise exn
       end
-||||||| Compiler:last-imported
-            arg_shape
-        | Some smty ->
-            let mty = transl_modtype env smty in
-            wrap_constraint_with_shape ~self_check:false env true arg
-              mty.mty_type mode.mode_modes arg_shape
-              (Tmodtype_explicit (mty, mode))
-      in
-      { md with
-        mod_loc = smod.pmod_loc;
-        mod_attributes = smod.pmod_attributes;
-      },
-      final_shape
-=======
-            arg_shape,
-            arg_discourse
-        | Some smty ->
-            let mty, discourse = transl_modtype env smty in
-            let md, final_shape =
-              wrap_constraint_with_shape ~self_check:false env true arg
-                mty.mty_type mode.mode_modes arg_shape
-                (Tmodtype_explicit (mty, mode))
-            in
-            md, final_shape, md_discourse_union arg_discourse discourse
-      in
-      { md with
-        mod_loc = smod.pmod_loc;
-        mod_attributes = smod.pmod_attributes;
-      },
-      final_shape,
-      discourse
->>>>>>> Compiler:HEAD
   | Pmod_unpack sexp ->
       let mode = Value.newvar 0 in
       let exp =
@@ -3550,8 +3535,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
-<<<<<<< Merlin:new-short-paths
-      Shape.leaf_for_unpack
+      Shape.leaf_for_unpack,
+      empty_md_discourse
   | Pmod_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
       { mod_desc = Tmod_typed_hole;
         mod_type = Mty_for_hole;
@@ -3559,13 +3544,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
-      Shape.dummy_mod
-||||||| Compiler:last-imported
-      Shape.leaf_for_unpack
-=======
-      Shape.leaf_for_unpack,
+      Shape.dummy_mod,
       empty_md_discourse
->>>>>>> Compiler:HEAD
   | Pmod_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
   | Pmod_instance glob ->
@@ -3610,6 +3590,7 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
     if alias && aliasable then
       (Env.add_required_global path env; md)
     else begin
+      Discourse.use_module env lid path;
       let mty = Mtype.find_type_of_module
           ~strengthen ~aliasable env path
       in
@@ -3924,6 +3905,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
       Env.enter_signature ~scope ~mod_shape
         (extract_sig_open env md.mod_loc md.mod_type) ~mode env
     in
+    let () = Discourse.define_signature newenv sg in
     let info, visibility =
       match toplevel with
       | Some false | None -> Some `From_open, Hidden
@@ -3956,7 +3938,6 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-<<<<<<< Merlin:new-short-paths
 (* In the real compiler, the `toplevel` argument is a `signature option` because it serves
    two purposes: To tweak typing if we're in the toplevel, and to pass in the signature
    for what's been typed so far in that case (needed by include functor).  But in merlin
@@ -3966,12 +3947,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
    extra argument (sig_acc), but leave `toplevel` alone to minimize the diff *)
 and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
     anchor env sig_acc sstr =
-||||||| Compiler:last-imported
-and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
-=======
-and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
   Discourse_types.with_nesting @@ fun () ->
->>>>>>> Compiler:HEAD
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
   let _, md_mode = register_allocation loc_md in
@@ -4040,6 +4016,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         | sig_item -> sig_item)
         sg
     in
+    (* The components of an included module path are already brought in U
+       under their full path by [include_module]: only the components of
+       an included structure are definitions of the file. *)
+    (match included_alias with
+     | Some (_, (_, path)) -> Discourse.include_module env path
+     | None -> Discourse.define_signature new_env sg);
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
       { incl_mod = modl;
@@ -4157,7 +4139,8 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
           decls
         in
         let shape_map = List.fold_left2
-          (fun map { typ_id; _} shape ->
+          (fun map { typ_id; typ_name; _} shape ->
+            Discourse.define_type newenv typ_name typ_id;
             Shape.Map.add_type map typ_id shape)
           shape_map
           decls
@@ -4232,11 +4215,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         let id, newenv, sg =
           match name.txt with
           | None -> None, env, []
-          | Some name ->
+          | Some name' ->
             let id, e = Env.enter_module_declaration
-              ~scope ~shape:md_shape name pres md ~mode env
+              ~scope ~shape:md_shape name' pres md ~mode env
             in
             let e = Env.update_short_paths e in
+            Discourse.define_module e { name with txt = name' } id;
             Signature_names.check_module names pmb_loc id;
             let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
             let md_modalities =
@@ -4313,7 +4297,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
             decls sbind in
         let newenv = (* allow aliasing recursive modules from outside *)
           List.fold_left
-            (fun env (id_opt, _, mty, _, _, mode, attrs, loc, shape, uid,
+            (fun env (id_opt, name, mty, _, _, mode, attrs, loc, shape, uid,
                       discourse) ->
                match id_opt with
                | None -> env
@@ -4329,8 +4313,13 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
                        md_discourse_alias = discourse.alias;
                      }
                    in
-                   Env.add_module_declaration ~check:true ~shape
-                     id Mp_present mdecl ~mode:mode.mode_modes env
+                   let env =
+                     Env.add_module_declaration ~check:true ~shape
+                       id Mp_present mdecl ~mode:mode.mode_modes env
+                   in
+                   Option.iter (fun txt ->
+                     Discourse.define_module env { name with txt } id) name.txt;
+                   env
             )
             env bindings1
         in
@@ -4583,6 +4572,8 @@ let type_module_type_of env smod =
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
         in
+        Discourse.use_module env lid path;
+        Discourse.modtype_of_components env path;
         let skip_nongen_check =
           List.for_all Ident.is_global (Path.heads path)
         in

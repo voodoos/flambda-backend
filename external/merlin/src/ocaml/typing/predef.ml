@@ -663,8 +663,15 @@ let or_null_kind tvar =
       cstr ident_this [unrestricted tvar or_null_argument_sort]] in
   Type_variant (cstrs, Variant_with_null, None)
 
+let discourse = ref Discourse_types.empty
+
 let decl_of_type_constr type_constr =
   let type_ident = ident_of_type_constr type_constr in
+  let () =
+    let path = Pident type_ident in
+    discourse := Discourse_types.add ~predef:true
+      (Shape.Sig_component_kind.Type, path) !discourse
+  in
   let type_uid = Uid.of_predef_id type_ident in
   (* The unboxed versions explicitly added to the predef are abstract, as they
      are special-cased; other unboxed versions are automatically derived. *)
@@ -1282,3 +1289,5 @@ let builtin_type_constrs =
   List.map
     (fun t -> let id = ident_of_type_constr t in (Ident.name id, id))
     all_type_constrs
+
+let discourse () = !discourse

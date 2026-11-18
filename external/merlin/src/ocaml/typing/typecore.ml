@@ -2364,8 +2364,7 @@ let solve_constructor_annotation
           new_local_type ~loc:name.loc Definition jkind
             ~manifest_and_scope:(tv, Ident.lowest_scope) in
         let (id, new_env) =
-          (* These redundant types should not be added to the shortpath graph. *)
-          Env.enter_type ~long_path:true ~scope:expansion_scope name.txt decl !!penv in
+          Env.enter_type ~scope:expansion_scope name.txt decl !!penv in
         Pattern_env.set_env penv new_env;
         {name with txt = id}, (decl, tv), jkind_annot_opt, jkind)
       name_list
@@ -6977,6 +6976,7 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
                 val_loc = loc;
                 val_attributes = [];
                 val_uid = Uid.internal_not_actually_unique;
+                val_discourse = Discourse_types.empty;
                 val_zero_alloc = Zero_alloc.default;
                 val_modalities = Modality.of_const Modality.Const.id
               };
@@ -7450,6 +7450,7 @@ and type_expect_
       let path, actual_mode, layout_args, desc, kind =
         type_ident env ~recarg lid
       in
+      Discourse.use_value env lid path;
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
@@ -10488,6 +10489,16 @@ and type_label_access
   let label, ambiguity =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
+  let () =
+    match labels with
+    | Ok ((label1, _) :: _) when label1 == label ->
+        (* We only add labels not used via type-based disambiguation to the
+           discourse. See the [Discourse] module. A label did not need
+           disambiguation if the selected name is the last introduced in scope.
+        *)
+        Discourse.use_label env lid label
+    | _ -> ()
+  in
   (record, record_sort, Mode.Value.disallow_right mode,
    label, expected_type, ambiguity)
   with exn ->
@@ -10512,6 +10523,7 @@ and type_label_access
         lbl_loc = lid.loc;
         lbl_attributes = [];
         lbl_uid = Uid.internal_not_actually_unique;
+        lbl_discourse = Discourse_types.empty;
         lbl_sort = None;
       }
     in
@@ -11533,6 +11545,16 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     wrap_disambiguate "This variant expression is expected to have"
       ty_expected_explained
       (Constructor.disambiguate Env.Positive lid env expected_type) constrs
+  in
+  let () =
+    match constrs with
+    | Ok (((constr1, _), _) :: _) when constr1 == constr ->
+        (* We only add constructors not used via type-based disambiguation to
+           the discourse. See the [Discourse] module. A constructor did not need
+           disambiguation if the selected name is the last introduced in scope.
+        *)
+        Discourse.use_constructor env lid constr
+    | _ -> ()
   in
   let sargs =
     match sarg with

@@ -1,0 +1,3 @@
+(cram
+ (applies_to sp-include-copy-server)
+ (locks ../server-tests/merlin_server))

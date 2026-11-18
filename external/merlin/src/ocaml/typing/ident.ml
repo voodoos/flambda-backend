@@ -485,5 +485,3 @@ let rename_no_exn = function
       Local { name; stamp = !currentstamp }
   | id -> id
 
-let get_currentstamp () =
-  !currentstamp
