@@ -86,3 +86,15 @@ knows about double underscores and gives the same result as the new one.)
   > -filename test2.ml < test2.ml | jq '.value[0].type'
   "int Or_error.t"
 
+
+The legacy implementation must not loop when printing from inside a recursive
+type declaration.
+
+  $ cat >rec.ml <<'EOF'
+  > module M = struct type u = A end
+  > type t = M.u -> unit
+  > EOF
+
+  $ $MERLIN single type-enclosing -position 2:11 \
+  > -filename rec.ml < rec.ml | jq -c '[.value[].type]'
+  ["type u = A","M.u","M.u -> unit","type t = M.u -> unit"]

@@ -3196,9 +3196,9 @@ let enter_value ?check ~mode name desc env =
   in
   (id, env)
 
-let enter_type ~scope name info env =
+let enter_type ?(long_path = false) ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-  let env = store_type ~check:true ~predef:false ~long_path:false ~hidden:false
+  let env = store_type ~check:true ~predef:false ~long_path ~hidden:false
     id info (Shape.leaf info.type_uid) env
   in
   (id, env)
@@ -3523,6 +3523,9 @@ let initial () =
       empty
   in
   initial_env
+
+let add_type_long_path ~check ?shape id info env =
+  add_type ~check ?shape ~predef:false ~long_path:true id info env
 
 let add_type ~check ?shape id info env =
   add_type ~check ?shape ~predef:false ~long_path:false id info env

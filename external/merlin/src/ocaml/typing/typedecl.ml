@@ -264,9 +264,12 @@ let make_params env path params =
 
 (* Enter all declared types in the environment as abstract types *)
 
-let add_type ~check ?shape id decl env =
+let add_type ~long_path ~check ?shape id decl env =
   Builtin_attributes.warning_scope ~ppwarning:false decl.type_attributes
-    (fun () -> Env.add_type ~check ?shape id decl env)
+    (fun () ->
+       match long_path with
+       | true -> Env.add_type_long_path ?shape ~check id decl env
+       | false -> Env.add_type ?shape ~check id decl env)
 
 (* Add a dummy type declaration to the environment, with the given arity.
    The [type_kind] is [Type_abstract], but there is a generic [type_manifest]
@@ -421,7 +424,7 @@ in
       type_unboxed_version;
     }
   in
-  add_type ~check:true id decl env
+  add_type ~long_path:true ~check:true id decl env
 
 (* nroberts: The below [update_type] is deleted upstream in
    https://github.com/ocaml/ocaml/pull/12180 to stop ocamlc from looping on some
@@ -3019,7 +3022,7 @@ let update_decls_jkind env order decls =
                    new_decl.type_jkind }
            else new_decl
          in
-         let env = add_type ~check:false id env_decl env in
+         let env = add_type ~long_path:true ~check:false id env_decl env in
          env, Ident.Map.add id (decl, allow_any_crossing, new_decl) results)
       (env, Ident.Map.empty) order
   in
@@ -3801,7 +3804,7 @@ let normalize_decl_jkinds env decls =
   let env =
     List.fold_right
       (fun (id, _, _, decl) env ->
-         add_type ~check:true id decl env)
+         add_type ~long_path:false ~check:true id decl env)
       decls env
   in
   List.fold_left_map
@@ -3813,7 +3816,7 @@ let normalize_decl_jkinds env decls =
        (* Add the decl with the normalized kind back to the environment, so that later
           kinds don't have to normalize this kind if they mention this type in their
           with-bounds *)
-       let env = add_type ~check:false id decl env in
+       let env = add_type ~long_path:false ~check:false id decl env in
        env, (id, decl)
     )
     env
@@ -3824,12 +3827,12 @@ let add_types_to_env ~shapes decls env =
   | None ->
     List.fold_right
       (fun (id, decl) env ->
-        add_type ~check:true id decl env)
+        add_type ~long_path:false ~check:true id decl env)
       decls env
   | Some shapes ->
     List.fold_right2
     (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
+      add_type ~long_path:false ~check:true ~shape id decl env)
     decls shapes env
 
 (* Translate a set of type declarations, mutually recursive or not *)
